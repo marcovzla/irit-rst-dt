@@ -10,8 +10,9 @@ from __future__ import print_function
 from os import path as fp
 import sys
 
-from attelo.fold import (select_testing)
+from attelo.fold import (select_testing, select_training)
 from attelo.io import (load_model)
+from attelo.table import mpack_pairing_distances
 from attelo.decoding.intra import (IntraInterPair)
 from attelo.harness.util import (makedirs)
 from attelo.util import (Team)
@@ -67,10 +68,14 @@ def delayed_decode(lconf, dconf, econf, fold):
     makedirs(fp.dirname(output_path))
 
     if fold is None:
+        # TODO read max_dist_by_lbl computed on train, stored in datapack maybe
         subpack = dconf.pack
     else:
+        # get maximal length of relations for each label, from train
+        # this will be passed to the decoders and used for pruning
+        train_mpack = select_training(dconf.pack, dconf.folds, fold)
+        max_dist_by_lbl = mpack_pairing_distances(train_mpack)
         subpack = select_testing(dconf.pack, dconf.folds, fold)
-
 
     doc_model_paths = attelo_doc_model_paths(lconf, econf.learner, fold)
     intra_flag = econf.settings.intra
@@ -93,6 +98,7 @@ def delayed_decode(lconf, dconf, econf, fold):
     return ath_decode.jobs(subpack, models,
                            econf.decoder.payload,
                            econf.settings.mode,
+                           max_dist_by_lbl,
                            output_path)
 
 
