@@ -203,7 +203,8 @@ class IritHarness(Harness):
         else:
             return {
                 'attach': _eval_model_path(rconf, "attach"),
-                'label': _eval_model_path(rconf, "relate")
+                'label': _eval_model_path(rconf, "relate"),
+                'su': _eval_model_path(rconf, "su"),
             }
 
     # ------------------------------------------------------

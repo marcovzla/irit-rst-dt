@@ -14,6 +14,8 @@ from attelo.harness.config import (EvaluationConfig,
 from attelo.learning.oracle import (AttachOracle, LabelOracle)
 from attelo.parser.full import (JointPipeline,
                                 PostlabelPipeline)
+from attelo.parser.same_unit import (JointSameUnitPipeline,
+                                     SklearnSameUnitClassifier)
 
 
 def combined_key(*variants):
@@ -109,6 +111,27 @@ def mk_joint(klearner, kdecoder):
     parser = JointPipeline(learner_attach=klearner.attach.payload,
                            learner_label=klearner.label.payload,
                            decoder=kdecoder.payload)
+    return EvaluationConfig(key=key,
+                            settings=settings,
+                            learner=klearner,
+                            parser=Keyed(parser_key, parser))
+
+
+def mk_joint_su(klearner, kdecoder):
+    "return a joint decoding parser config with same-unit"
+    settings = _core_settings('AD.L-jnt_su', klearner)
+    parser_key = combined_key(settings, kdecoder)
+    key = combined_key(klearner, parser_key)
+    # su: use same kind of learner as "attach"
+    parser = JointSameUnitPipeline(
+        learner_attach=klearner.attach.payload,
+        learner_label=klearner.label.payload,
+        learner_su=(
+            SklearnSameUnitClassifier(klearner.attach.payload._learner)
+            if not isinstance(klearner.attach.payload, AttachOracle)
+            else klearner.attach.payload
+        ),
+        decoder=kdecoder.payload)
     return EvaluationConfig(key=key,
                             settings=settings,
                             learner=klearner,
