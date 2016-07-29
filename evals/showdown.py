@@ -46,6 +46,12 @@ EISNER_OUT_SYN_PRED = os.path.join(
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
+EISNER_OUT_SYN_PRED_SU = os.path.join(
+    '/home/mmorey/melodi',
+    'irit-rst-dt/TMP/latest',  # lbl
+    'scratch-current/combined',
+    'output.maxent-AD.L-jnt_su-eisner')
+
 EISNER_OUT_SYN_GOLD = os.path.join(
     '/home/mmorey/melodi',
     'irit-rst-dt/TMP/syn_gold_coarse',  # lbl
@@ -56,11 +62,18 @@ CODRA_OUT_DIR = '/home/mmorey/melodi/joty/Doc-level'
 
 
 
-# FIXME load gold trees here once and for all, pass them to each
-# evaluation
+# FIXME:
+# * [ ] load gold trees here once and for all, pass them to each evaluation
+# * [ ] create summary table with one system per row, one metric per column,
+#   keep only the f-score (because for binary trees with manual segmentation
+#   precision = recall = f-score).
 
 print('CODRA (Joty)')
-eval_codra_output(CODRA_OUT_DIR)
+eval_codra_output(CODRA_OUT_DIR, EDUS_FILE,
+                  nuc_strategy="unamb_else_most_frequent",
+                  rank_strategy='closest-intra-rl-inter-rl',
+                  prioritize_same_unit=True,
+                  detailed=True)
 print('=======================')
 
 print('Eisner, predicted syntax')
@@ -68,7 +81,17 @@ load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED, EDUS_FILE,
                                  nuc_strategy="unamb_else_most_frequent",
                                  # nuc_strategy="most_frequent_by_rel",
                                  rank_strategy='closest-intra-rl-inter-rl',
-                                 prioritize_same_unit=True)
+                                 prioritize_same_unit=True,
+                                 detailed=True)
+print('======================')
+
+print('Eisner, predicted syntax + same-unit')
+load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                                 nuc_strategy="unamb_else_most_frequent",
+                                 # nuc_strategy="most_frequent_by_rel",
+                                 rank_strategy='closest-intra-rl-inter-rl',
+                                 prioritize_same_unit=True,
+                                 detailed=True)
 print('======================')
 
 print('Eisner, gold syntax')

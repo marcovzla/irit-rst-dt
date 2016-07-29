@@ -117,21 +117,18 @@ class IritHarness(Harness):
 
         Returns
         -------
-        path_to_edu_input : string
-
-        path_to_pairings : string
-
-        path_to_features : string
-
-        path_to_vocab : string
-
-        corpus_path : string
-            Path to corpus in order to access gold structures (WIP).
+        paths: tuple of file paths
+            Path to: edu_input, pairings, features, vocab, cdu_input,
+            cdu_pairings, cdu_features, corpus (to access gold
+            structures, WIP).
         """
-        ext = 'relations.sparse'
+        ext = 'relations.edu-pairs.sparse'
         # path to data file in the evaluation dir
         dset = self.testset if test_data else self.dataset
         core_path = fp.join(self.eval_dir, "%s.%s" % (dset, ext))
+        # 2016-07-28 pairs on fragmented EDUs
+        frag_ext = 'relations.frag-pairs.sparse'
+        frag_path = fp.join(self.eval_dir, "%s.%s" % (dset, frag_ext))
         # WIP gold RST trees
         corpus_path = fp.abspath(TEST_CORPUS if test_data
                                  else TRAINING_CORPUS)
@@ -140,6 +137,11 @@ class IritHarness(Harness):
                 core_path + '.pairings',
                 (core_path + '.stripped') if stripped else core_path,
                 core_path + '.vocab',
+                # fragmented EDUs
+                frag_path + '.cdu_input',
+                frag_path + '.pairings',
+                (frag_path + '.stripped') if stripped else frag_path,
+                # corpus
                 corpus_path)
 
     def model_paths(self, rconf, fold, parser):

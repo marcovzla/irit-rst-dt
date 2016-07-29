@@ -49,6 +49,7 @@ from .config.common import (ORACLE,
                             decoder_last,
                             decoder_local,
                             mk_joint,
+                            mk_joint_su,
                             mk_post)
 
 # PATHS
@@ -64,8 +65,8 @@ SNAPSHOTS = 'SNAPSHOTS'
 """Results over time we are making a point of saving"""
 
 # TRAINING_CORPUS = 'tiny'
-# TRAINING_CORPUS = 'corpus/RSTtrees-WSJ-main-1.0/TRAINING'
-TRAINING_CORPUS = 'corpus/RSTtrees-WSJ-double-1.0'
+TRAINING_CORPUS = 'corpus/RSTtrees-WSJ-main-1.0/TRAINING'
+# TRAINING_CORPUS = 'corpus/RSTtrees-WSJ-double-1.0'
 """Corpora for use in building/training models and running our
 incremental experiments. Later on we should consider using the
 held-out test data for something, but let's make a point of
@@ -90,10 +91,11 @@ Wouldn't want to overfit to the test corpus, now would we?
 validation on the training data)
 """
 
-TEST_EVALUATION_KEY = None
+# TEST_EVALUATION_KEY = None
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-mst'
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-eisner'
-# TEST_EVALUATION_KEY = 'maxent-iheads-global-AD.L-jnt-eisner'
+# TEST_EVALUATION_KEY = 'maxent-AD.L-jnt_su-eisner'
+TEST_EVALUATION_KEY = 'maxent-iheads-global-AD.L-jnt_su-eisner'
 """Evaluation to use for testing.
 
 Leave this to None until you think it's OK to look at the test data.
@@ -109,8 +111,9 @@ Where to read the Penn Treebank from (should be dir corresponding to
 parsed/mrg/wsj)
 """
 
-CORENLP_OUT_DIR = None
+# CORENLP_OUT_DIR = None
 # CORENLP_OUT_DIR = '/projets/melodi/corpus/rst-dt-corenlp-2015-01-29'
+CORENLP_OUT_DIR = '/home/mmorey/corpora/rst-dt-corenlp-2015-01-29'
 """
 Where to read parses from CoreNLP from
 """
@@ -124,6 +127,16 @@ Where to read the LECSIE features from
 FEATURE_SET = 'dev'  # one of ['dev', 'eyk', 'li2014']
 """
 Which feature set to use for feature extraction
+"""
+
+LABEL_SET = 'coarse'  # one of {'coarse', 'fine'} or a list of strings
+"""
+Which label set to use
+"""
+
+SAME_UNIT = 'joint'  # one of {'joint', 'preproc', 'no'}
+"""
+Whether to have a special processing for same-unit
 """
 
 FIXED_FOLD_FILE = None
@@ -253,6 +266,19 @@ def _core_parsers(klearner, unique_real_root=True):
                                     use_prob=True)),
             ]
         ]
+        # WIP with same-unit
+        if SAME_UNIT == 'joint':
+            joint.extend([
+                mk_joint_su(klearner, d) for d in [
+                    # decoder_last(),
+                    # DECODER_LOCAL,
+                    # decoder_mst(),
+                    Keyed('eisner',
+                          EisnerDecoder(unique_real_root=unique_real_root,
+                                        use_prob=True)),
+                    ]
+            ])
+        # end WIP
 
     # postlabeling
     use_prob = klearner.attach.payload.can_predict_proba
@@ -261,9 +287,9 @@ def _core_parsers(klearner, unique_real_root=True):
             # decoder_last() ,
             # DECODER_LOCAL,
             # decoder_mst(),
-            Keyed('eisner',
-                  EisnerDecoder(unique_real_root=unique_real_root,
-                                use_prob=use_prob)),
+            # Keyed('eisner',
+            #       EisnerDecoder(unique_real_root=unique_real_root,
+            #                     use_prob=use_prob)),
         ]
     ]
 

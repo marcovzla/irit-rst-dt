@@ -7,6 +7,8 @@ from __future__ import print_function
 from collections import defaultdict
 import os
 
+import numpy as np
+
 from educe.annotation import Span as EduceSpan
 from educe.rst_dt.annotation import (EDU as EduceEDU,
                                      SimpleRSTTree, _binarize)
@@ -16,6 +18,7 @@ from educe.rst_dt.dep2con import (deptree_to_simple_rst_tree,
                                   DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 from educe.rst_dt.deptree import RstDepTree, RstDtException
+from educe.rst_dt.document_plus import align_edus_with_paragraphs
 #
 from attelo.io import load_edus
 from attelo.metrics.constituency import (parseval_detailed_report,
@@ -78,6 +81,7 @@ def load_attelo_output_file(output_file):
 def load_deptrees_from_attelo_output(output_file, edus_file,
                                      nuc_strategy, rank_strategy,
                                      prioritize_same_unit=True,
+                                     detailed=False,
                                      skpd_docs=None):
     """Load an RstDepTree from the output of attelo.
 
@@ -97,6 +101,8 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     skipped_docs: set(string)
         Names of documents that have been skipped to compute scores
     """
+    doc_name2edu2para = dict()
+
     # load reference trees
     dtree_true = dict()  # dependency trees
     ctree_true = dict()  # constituency trees
@@ -116,6 +122,36 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
         bin_srtree_true = SimpleRSTTree.from_rst_tree(coarse_rtree_true)
         dt_true = RstDepTree.from_simple_rst_tree(bin_srtree_true)
         dtree_true[doc_name] = dt_true
+
+        # 2016-06-28 retrieve paragraph idx of each EDU
+        # FIXME refactor to get in a better way, in a better place
+        # currently, we take EDUs from the RSTTree and paragraphs from
+        # the RSTContext, so no left padding in either list ;
+        # the dtree contains the left padding EDU, so we compute the
+        # edu2paragraph alignment on real units only, shift by one,
+        # then prepend 0
+        doc_edus = rtree_true.leaves()
+        doc_paras = doc_edus[0].context.paragraphs
+        doc_txt = doc_edus[0].context._text
+        if doc_paras is not None:
+            edu2para = align_edus_with_paragraphs(
+                doc_edus, doc_paras, doc_txt)
+            # yerk: interpolate values in edu2para where missing
+            edu2para_fix = []
+            for edu_idx in edu2para:
+                if edu_idx is not None:
+                    edu2para_fix.append(edu_idx)
+                else:
+                    # interpolation strategy: copy the last regular value
+                    # that has been seen
+                    edu2para_fix.append(edu2para_fix[-1])
+            edu2para = edu2para_fix
+            # end yerk: interpolate
+            edu2para = [0] + list(np.array(edu2para) + 1)
+            doc_name2edu2para[doc_name] = edu2para
+        else:
+            doc_name2edu2para[doc_name] = None
+        # end retrieve paragraph idx
 
     # USE TO INCORPORATE CONSTITUENCY LOSS INTO STRUCTURED CLASSIFIERS
     # load predicted trees
@@ -196,6 +232,10 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
         # EXPERIMENTAL attach array of sentence index for each EDU in tree
         edu2sent = doc_name2edu2sent[doc_name]
         dt_pred.sent_idx = edu2sent
+        # 2016-06-28 same for edu2para
+        edu2para = doc_name2edu2para[doc_name]
+        dt_pred.para_idx = edu2para
+        # assert len(edu2sent) == len(edu2para)
         # end EXPERIMENTAL
         if False:  # DEBUG
             print(doc_name)
@@ -253,7 +293,8 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     print(parseval_report(ctree_true, ctree_pred,
                           digits=4))
     # detailed report on S+N+R
-    print(parseval_detailed_report(ctree_true, ctree_pred,
-                                   metric_type='S+R'))
+    if detailed:
+        print(parseval_detailed_report(ctree_true, ctree_pred,
+                                       metric_type='S+R'))
 
     return skipped_docs
