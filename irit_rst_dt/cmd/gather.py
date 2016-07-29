@@ -64,7 +64,7 @@ def extract_features(corpus, output_dir, fix_pseudo_rels, instances,
         Path to the output folder.
     fix_pseudo_rels: boolean, False by default
         Rewrite pseudo-relations to improve consistency (WIP).
-    instances: one of {'same-unit', 'all-pairs'}
+    instances: one of {'same-unit', 'edu-pairs'}
         Selection of instances to extract.
     vocab_path: filepath
         Path to a fixed vocabulary mapping, for feature extraction
@@ -128,13 +128,13 @@ def main(args):
     # same-unit
     instances = 'same-unit'
     su_prefix_train = '{}.{}'.format(
-        instances, os.path.basename(TRAINING_CORPUS))
+        os.path.basename(TRAINING_CORPUS), instances)
     su_train_path = os.path.join(tdir, su_prefix_train)
     su_label_path = su_train_path + '.relations.sparse'
     su_vocab_path = su_label_path + '.vocab'
     if TEST_CORPUS is not None:
         su_prefix_test = '{}.{}'.format(
-            instances, os.path.basename(TEST_CORPUS))
+            os.path.basename(TEST_CORPUS), instances)
         su_test_path = os.path.join(tdir, su_prefix_test)
 
     if SAME_UNIT in ['joint', 'preproc'] and not args.resume_frag_pairs:
@@ -150,14 +150,14 @@ def main(args):
                              label_path=su_label_path)
 
     # all pairs
-    instances = 'all-pairs'
+    instances = 'edu-pairs'
     if not args.skip_training and not args.resume_frag_pairs:
         extract_features(TRAINING_CORPUS, tdir, fix_pseudo_rels,
                          instances)
     # path to the vocab and labelset gathered from the training set,
     # we'll use these paths for the test set and for the frag-pairs
     prefix_train = '{}.{}'.format(
-        instances, os.path.basename(TRAINING_CORPUS))
+        os.path.basename(TRAINING_CORPUS), instances)
     train_path = os.path.join(tdir, prefix_train)
     label_path = train_path + '.relations.sparse'
     vocab_path = label_path + '.vocab'
@@ -171,9 +171,9 @@ def main(args):
     # the other fragmented EDUs and the EDUs that don't belong to any
     # fragmented EDU
     instances = 'frag-pairs'
-    # we use the vocabulary and labelset from "all-pairs" ; this is the
+    # we use the vocabulary and labelset from "edu-pairs" ; this is the
     # simplest solution currently and it seems correct, but maybe we
-    # could extend "all-pairs" with these pairs when we learn the
+    # could extend "edu-pairs" with these pairs when we learn the
     # vocabulary?
     if not args.skip_training:
         frag_edus_train = su_train_path + '.relations' + '.deps_true'
