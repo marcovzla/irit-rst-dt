@@ -11,7 +11,13 @@ import copy
 from os import path as fp
 import itertools as itr
 
-from attelo.harness.config import (LearnerConfig,
+from sklearn.linear_model import (LogisticRegression)
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+# attelo
+from attelo.harness.config import (EvaluationConfig,
+                                   LearnerConfig,
                                    Keyed)
 # from attelo.decoding.astar import (AstarArgs,
 #                                    AstarDecoder,
@@ -26,12 +32,7 @@ from attelo.parser.intra import (IntraInterPair,
                                  FrontierToHeadParser,
                                  # SentOnlyParser,
                                  SoftParser)
-
-from sklearn.linear_model import (LogisticRegression)
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-
-
+# this harness
 from .config.intra import (combine_intra)
 from .config.perceptron import (attach_learner_dp_pa,
                                 attach_learner_dp_perc,
@@ -50,7 +51,10 @@ from .config.common import (ORACLE,
                             decoder_local,
                             mk_joint,
                             mk_joint_su,
-                            mk_post)
+                            mk_su_joint,
+                            mk_post,
+                            JointPipeline,
+                            Settings)
 
 # PATHS
 
@@ -278,6 +282,17 @@ def _core_parsers(klearner, unique_real_root=True):
                                         use_prob=True)),
                     ]
             ])
+        elif SAME_UNIT == 'preproc':
+            joint.extend([
+                mk_su_joint(klearner, d) for d in [
+                    # decoder_last(),
+                    # DECODER_LOCAL,
+                    # decoder_mst(),
+                    Keyed('eisner',
+                          EisnerDecoder(unique_real_root=unique_real_root,
+                                        use_prob=True)),
+                    ]
+            ])
         # end WIP
 
     # postlabeling
@@ -322,74 +337,26 @@ edges will be printed to stdout"""
 HARNESS_NAME = 'irit-rst-dt'
 
 
-# possibly obsolete
-def _mk_basic_intras(klearner, kconf):
-    """Intra/inter parser based on a single core parser
-    """
-    # NEW intra parsers are explicitly authorized to have more than one
-    # real root (necessary for the Eisner decoder, maybe other decoders too)
-    parsers = [IntraInterPair(intra=x, inter=y) for x, y in
-               zip(_core_parsers(klearner, unique_real_root=False),
-                   _core_parsers(klearner))]
-    return [combine_intra(p, kconf) for p in parsers]
-
-
-def _mk_sorc_intras(klearner, kconf):
-    """Intra/inter parsers based on a single core parser
-    and a sentence oracle
-    """
-    parsers = [IntraInterPair(intra=x, inter=y) for x, y in
-               zip(_core_parsers(ORACLE, unique_real_root=False),
-                   _core_parsers(klearner))]
-    return [combine_intra(p, kconf, primary='inter') for p in parsers]
-
-
-def _mk_dorc_intras(klearner, kconf):
-    """Intra/inter parsers based on a single core parser
-    and a document oracle
-    """
-    parsers = [IntraInterPair(intra=x, inter=y) for x, y in
-               zip(_core_parsers(klearner, unique_real_root=False),
-                   _core_parsers(ORACLE))]
-    return [combine_intra(p, kconf, primary='intra') for p in parsers]
-
-
-def _mk_last_intras(klearner, kconf):
-    """Parsers using "last" for intra and a core decoder for inter.
-    """
-    if ((not klearner.attach.payload.can_predict_proba or
-         not klearner.label.payload.can_predict_proba)):
-        return []
-
-    kconf = Keyed(key=combined_key('last', kconf),
-                  payload=kconf.payload)
-    econf_last = mk_joint(klearner, decoder_last())
-    parsers = [IntraInterPair(intra=econf_last, inter=y) for y in
-               _core_parsers(klearner)]
-    return [combine_intra(p, kconf, primary='inter') for p in parsers]
-# end of possibly obsolete
-
-
 def _is_junk(econf):
     """
     Any configuration for which this function returns True
     will be silently discarded
     """
     # intrasential head to head mode only works with mst for now
-    has = econf.settings
-    kids = econf.settings.children
-    has_intra_oracle = has.intra and (kids.intra.oracle or kids.inter.oracle)
-    has_any_oracle = has.oracle or has_intra_oracle
+    has_intra_oracle = (econf.settings.intra
+                        and (econf.settings.children.intra.oracle
+                             or econf.settings.children.inter.oracle))
+    has_any_oracle = econf.settings.oracle or has_intra_oracle
 
-    decoder_name = econf.parser.key[len(has.key) + 1:]
+    decoder_name = econf.parser.key[len(econf.settings.key) + 1:]
     # last with last-based intra decoders is a bit redundant
-    if has.intra and decoder_name == 'last':
+    if econf.settings.intra and decoder_name == 'last':
         return True
 
     # oracle would be redundant with sentence/doc oracles
     # FIXME the above is wrong for intra/inter parsers because gold edges
     # can fall out of the search space
-    if has.oracle and has_intra_oracle:
+    if econf.settings.oracle and has_intra_oracle:
         return True  # FIXME should sometimes be False
 
     # toggle or comment to enable filtering in/out oracles
@@ -404,6 +371,24 @@ def _evaluations():
     res = []
 
     # == one-step (global) parsers ==
+    # WIP
+    # maxent, eisner, AD.L-jnt
+    maxent_klearner = LearnerConfig(attach=attach_learner_maxent(),
+                                    label=label_learner_maxent())
+    res.append(
+        EvaluationConfig(key='maxent-AD.L-jnt-eisner-NEW',
+                         settings=Settings(key='AD.L-jnt',
+                                           intra=False,
+                                           oracle=False,
+                                           children=None),
+                         learner=maxent_klearner,
+                         parser=Keyed('AD.L-jnt-eisner-NEW',
+                                      JointPipeline(
+                                          learner_attach=maxent_klearner.attach.payload,
+                                          learner_label=maxent_klearner.label.payload,
+                                          decoder=EisnerDecoder(unique_real_root=True, use_prob=True))))
+    )
+    # end WIP
     learners = []
     learners.extend(_LOCAL_LEARNERS)
     # current structured learners don't do probs, hence non-prob decoders
@@ -412,8 +397,8 @@ def _evaluations():
     # MST is disabled by default, as it does not output projective trees
     # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
     # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
-    global_parsers = itr.chain.from_iterable(_core_parsers(l)
-                                             for l in learners)
+    global_parsers = itr.chain.from_iterable(
+        _core_parsers(l) for l in learners)
     res.extend(global_parsers)
 
     # == two-step parsers: intra then inter-sentential ==
@@ -449,9 +434,12 @@ def _evaluations():
         # NEW intra parsers are explicitly authorized (in fact, expected)
         # to have more than one real root ; this is necessary for the
         # Eisner decoder and probably others, with "hard" strategies
-        ii_pairs.extend(IntraInterPair(intra=x, inter=y) for x, y in
-                        zip(_core_parsers(intra_lnr, unique_real_root=True),  # TODO add unique_real_root to hyperparameters in grid search
-                            _core_parsers(inter_lnr, unique_real_root=True)))
+        # TODO add unique_real_root to hyperparameters in grid search
+        ii_pairs.extend(
+            IntraInterPair(intra=x, inter=y) for x, y in
+            zip(_core_parsers(intra_lnr, unique_real_root=True),
+                _core_parsers(inter_lnr, unique_real_root=True))
+        )
     # cross-product: pairs of parsers x intra-/inter- configs
     ii_parsers = [combine_intra(p, kconf,
                                 primary=('inter' if p.intra.settings.oracle
@@ -484,9 +472,9 @@ def _want_details(econf):
     else:
         learners = [econf.learner]
     has_maxent = any('maxent' in l.key for l in learners)
-    has = econf.settings
-    kids = econf.settings.children
-    has_intra_oracle = has.intra and (kids.intra.oracle or kids.inter.oracle)
+    has_intra_oracle = (econf.settings.intra and
+                        (econf.settings.children.intra.oracle or
+                         econf.settings.children.inter.oracle))
     return (has_maxent and
             ('mst' in econf.parser.key or 'astar' in econf.parser.key or
              'eisner' in econf.parser.key) and

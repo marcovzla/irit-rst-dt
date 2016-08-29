@@ -145,7 +145,7 @@ def mk_su_joint(klearner, kdecoder):
     parser_key = combined_key(settings, kdecoder)
     key = combined_key(klearner, parser_key)
     # su: use same kind of learner as "attach"
-    parser = SameUnitJointPipeline(
+    parser = JointSameUnitPipeline(
         learner_su=(
             SklearnSameUnitClassifier(klearner.attach.payload._learner)
             if not isinstance(klearner.attach.payload, AttachOracle)

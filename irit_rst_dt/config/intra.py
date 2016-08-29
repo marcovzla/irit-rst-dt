@@ -11,17 +11,17 @@ def combine_intra(econfs, kconf, primary='intra', verbose=False):
     Parameters
     ----------
     econfs: IntraInterPair(EvaluationConfig)
-
+        Evaluation configs for the intra and inter parsers.
     kconf: Keyed(parser constructor)
-
-    primary: ['intra', 'inter']
-        Treat the intra/inter config as the primary one for the key
+        Key for the whole intra/inter parser.
+    primary: one of {'intra', 'inter'}
+        Treat the intra or inter config as the primary one for the key.
     verbose: boolean, optional
         Verbosity of the intra/inter parser
 
     Returns
     -------
-    econf : EvaluationConfig
+    econf: EvaluationConfig
         Evaluation configuration for the IntraInterParser.
     """
     if primary == 'intra':
