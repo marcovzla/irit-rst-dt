@@ -6,12 +6,17 @@ gather features
 """
 
 from __future__ import print_function
+import itertools
 import os
 
 from attelo.harness.util import call, force_symlink
+from attelo.learning.oracle import AttachOracle
+from attelo.parser.intra import IntraInterParser
+from attelo.parser.same_unit import SameUnitClassifierWrapper
 
 from ..local import (FEATURE_SET, LABEL_SET, TEST_CORPUS, TRAINING_CORPUS,
-                     SAME_UNIT, PTB_DIR, CORENLP_OUT_DIR, LECSIE_DATA_DIR)
+                     SAME_UNIT, PTB_DIR, CORENLP_OUT_DIR, LECSIE_DATA_DIR,
+                     EVALUATIONS)
 from ..util import (current_tmp, latest_tmp)
 
 NAME = 'gather'
@@ -125,26 +130,41 @@ def main(args):
 
     fix_pseudo_rels = args.fix_pseudo_rels
 
+    # 2016-09-01 put data files in {tdir}/data
+    tdir_data = os.path.join(tdir, 'data')
+    if not os.path.exists(tdir_data):
+        os.makedirs(tdir_data)
     # same-unit
-    instances = 'same-unit'
-    su_prefix_train = '{}.{}'.format(
-        os.path.basename(TRAINING_CORPUS), instances)
-    su_train_path = os.path.join(tdir, su_prefix_train)
-    su_label_path = su_train_path + '.relations.sparse'
-    su_vocab_path = su_label_path + '.vocab'
-    if TEST_CORPUS is not None:
-        su_prefix_test = '{}.{}'.format(
-            os.path.basename(TEST_CORPUS), instances)
-        su_test_path = os.path.join(tdir, su_prefix_test)
+    all_parsers = []
+    for econf in EVALUATIONS:
+        parser = econf.parser[1]
+        if isinstance(parser, IntraInterParser):
+            all_parsers.extend(x[1] for x in itertools.chain(
+                parser._parsers.intra.steps, parser._parsers.inter.steps))
+        else:
+            all_parsers.extend(x[1] for x in parser.steps)
+    same_unit_parsers = [x for x in all_parsers
+                         if isinstance(x, SameUnitClassifierWrapper)]
+    same_unit_clfs = [x._learner_su for x in same_unit_parsers]
+    if same_unit_parsers and not args.resume_frag_pairs:
+        instances = 'same-unit'
+        su_prefix_train = '{}.relations.{}'.format(
+            os.path.basename(TRAINING_CORPUS), instances)
+        su_train_path = os.path.join(tdir_data, su_prefix_train)
+        su_label_path = su_train_path + '.labels'
+        su_vocab_path = su_train_path + '.sparse.vocab'
+        if TEST_CORPUS is not None:
+            su_prefix_test = '{}.{}'.format(
+                os.path.basename(TEST_CORPUS), instances)
+            su_test_path = os.path.join(tdir_data, su_prefix_test)
 
-    if SAME_UNIT in ['joint', 'preproc'] and not args.resume_frag_pairs:
         if not args.skip_training:
             # * train
-            extract_features(TRAINING_CORPUS, tdir, fix_pseudo_rels,
+            extract_features(TRAINING_CORPUS, tdir_data, fix_pseudo_rels,
                              instances)
         if TEST_CORPUS is not None:
             # * test
-            extract_features(TEST_CORPUS, tdir, fix_pseudo_rels,
+            extract_features(TEST_CORPUS, tdir_data, fix_pseudo_rels,
                              instances,
                              vocab_path=su_vocab_path,
                              label_path=su_label_path)
@@ -152,17 +172,17 @@ def main(args):
     # all pairs
     instances = 'edu-pairs'
     if not args.skip_training and not args.resume_frag_pairs:
-        extract_features(TRAINING_CORPUS, tdir, fix_pseudo_rels,
+        extract_features(TRAINING_CORPUS, tdir_data, fix_pseudo_rels,
                          instances)
     # path to the vocab and labelset gathered from the training set,
     # we'll use these paths for the test set and for the frag-pairs
-    prefix_train = '{}.{}'.format(
+    prefix_train = '{}.relations.{}'.format(
         os.path.basename(TRAINING_CORPUS), instances)
-    train_path = os.path.join(tdir, prefix_train)
-    label_path = train_path + '.relations.sparse'
-    vocab_path = label_path + '.vocab'
+    train_path = os.path.join(tdir_data, prefix_train)
+    label_path = train_path + '.labels'
+    vocab_path = train_path + '.sparse.vocab'
     if TEST_CORPUS is not None and not args.resume_frag_pairs:
-        extract_features(TEST_CORPUS, tdir, fix_pseudo_rels,
+        extract_features(TEST_CORPUS, tdir_data, fix_pseudo_rels,
                          instances,
                          vocab_path=vocab_path,
                          label_path=label_path)
@@ -171,25 +191,27 @@ def main(args):
     # the other fragmented EDUs and the EDUs that don't belong to any
     # fragmented EDU
     instances = 'frag-pairs'
-    # we use the vocabulary and labelset from "edu-pairs" ; this is the
-    # simplest solution currently and it seems correct, but maybe we
-    # could extend "edu-pairs" with these pairs when we learn the
-    # vocabulary?
-    if not args.skip_training:
-        frag_edus_train = su_train_path + '.relations' + '.deps_true'
-        extract_features(TRAINING_CORPUS, tdir, fix_pseudo_rels,
-                         instances, frag_edus=frag_edus_train,
-                         vocab_path=vocab_path,
-                         label_path=label_path)
-    if TEST_CORPUS is not None:
-        frag_edus_test = su_test_path + '.relations' + '.deps_true'
-        extract_features(TEST_CORPUS, tdir, fix_pseudo_rels,
-                         instances, frag_edus=frag_edus_test,
-                         vocab_path=vocab_path,
-                         label_path=label_path)
+    same_unit_types = set(('true' if isinstance(x, AttachOracle)
+                           else 'pred')
+                          for clf in same_unit_clfs)
+    for same_unit_type in sorted(same_unit_types):
+        # we use the vocabulary and labelset from "edu-pairs" ; this is the
+        # simplest solution currently and it seems correct, but maybe we
+        # could extend "edu-pairs" with these pairs when we learn the
+        # vocabulary?
+        if not args.skip_training:
+            extract_features(TRAINING_CORPUS, tdir_data, fix_pseudo_rels,
+                             instances, frag_edus=same_unit_type,
+                             vocab_path=vocab_path,
+                             label_path=label_path)
+        if TEST_CORPUS is not None:
+            extract_features(TEST_CORPUS, tdir_data, fix_pseudo_rels,
+                             instances, frag_edus=same_unit_type,
+                             vocab_path=vocab_path,
+                             label_path=label_path)
     # end frag pairs        
 
-    with open(os.path.join(tdir, "versions-gather.txt"), "w") as stream:
+    with open(os.path.join(tdir_data, "versions-gather.txt"), "w") as stream:
         call(["pip", "freeze"], stdout=stream)
 
     if not (args.skip_training or args.resume_frag_pairs):

@@ -1,7 +1,9 @@
 """Commonly used configuration options"""
 
 from collections import namedtuple
+import copy
 import six
+
 # from attelo.decoding.astar import (AstarArgs,
 #                                    AstarDecoder,
 #                                    Heuristic,
@@ -15,8 +17,7 @@ from attelo.learning.oracle import (AttachOracle, LabelOracle)
 from attelo.parser.full import (JointPipeline,
                                 PostlabelPipeline)
 from attelo.parser.same_unit import (JointSameUnitPipeline,
-                                     SameUnitJointPipeline,
-                                     SklearnSameUnitClassifier)
+                                     SameUnitJointPipeline)
 
 
 def combined_key(*variants):
@@ -127,11 +128,9 @@ def mk_joint_su(klearner, kdecoder):
     parser = JointSameUnitPipeline(
         learner_attach=klearner.attach.payload,
         learner_label=klearner.label.payload,
-        learner_su=(
-            SklearnSameUnitClassifier(klearner.attach.payload._learner)
-            if not isinstance(klearner.attach.payload, AttachOracle)
-            else klearner.attach.payload
-        ),
+        # FIXME this copy does not really make sense here, but at least
+        # its type is correct
+        learner_su=copy.deepcopy(klearner.attach.payload),
         decoder=kdecoder.payload)
     return EvaluationConfig(key=key,
                             settings=settings,
@@ -146,11 +145,9 @@ def mk_su_joint(klearner, kdecoder):
     key = combined_key(klearner, parser_key)
     # su: use same kind of learner as "attach"
     parser = JointSameUnitPipeline(
-        learner_su=(
-            SklearnSameUnitClassifier(klearner.attach.payload._learner)
-            if not isinstance(klearner.attach.payload, AttachOracle)
-            else klearner.attach.payload
-        ),
+        # FIXME this copy does not really make sense here, but at least
+        # its type is correct
+        learner_su=copy.deepcopy(klearner.attach.payload),
         learner_attach=klearner.attach.payload,
         learner_label=klearner.label.payload,
         decoder=kdecoder.payload)

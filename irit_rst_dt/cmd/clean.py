@@ -34,10 +34,10 @@ def main(_):
     You shouldn't need to call this yourself if you're using
     `config_argparser`
     """
-    for data_dir in sorted(subdirs(LOCAL_TMP)):
-        if fp.basename(data_dir) == "latest":
+    for base_dir in sorted(subdirs(LOCAL_TMP)):
+        if fp.basename(base_dir) == "latest":
             continue
-        for subdir in subdirs(data_dir):
+        for subdir in subdirs(base_dir):
             bname = fp.basename(subdir)
             if bname in ["eval-current", "eval-previous",
                          "scratch-current", "scratch-previous"]:
