@@ -31,9 +31,9 @@ def combine_intra(econfs, kconf, primary='intra', verbose=False):
     else:
         raise ValueError("'primary' should be one of intra/inter: " + primary)
 
-    parsers = econfs.fmap(lambda e: e.parser.payload)
-    subsettings = econfs.fmap(lambda e: e.settings)
-    learners = econfs.fmap(lambda e: e.learner)
+    parsers = econfs.fmap(lambda e: e.parser.payload)  # IntraInterPair
+    subsettings = econfs.fmap(lambda e: e.settings)  # IntraInterPair
+    learners = econfs.fmap(lambda e: e.learner)  # IntraInterPair
     settings = Settings(key=combined_key(kconf, econf.settings),
                         intra=True,
                         oracle=econf.settings.oracle,

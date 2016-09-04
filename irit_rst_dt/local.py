@@ -27,11 +27,15 @@ from attelo.decoding.eisner import EisnerDecoder
 from attelo.decoding.mst import (MstDecoder, MstRootStrategy)
 from attelo.learning.local import (SklearnAttachClassifier,
                                    SklearnLabelClassifier)
+from attelo.learning.oracle import AttachOracle
 from attelo.parser.intra import (IntraInterPair,
                                  HeadToHeadParser,
                                  FrontierToHeadParser,
                                  # SentOnlyParser,
                                  SoftParser)
+from attelo.parser.same_unit import (JointSameUnitPipeline,
+                                     SameUnitJointPipeline)
+
 # this harness
 from .config.intra import (combine_intra)
 from .config.perceptron import (attach_learner_dp_pa,
@@ -252,7 +256,7 @@ We assume that they cannot be used relation modelling
 """
 
 
-def _core_parsers(klearner, unique_real_root=True):
+def _core_parsers(klearner, unique_real_root=True, same_unit='no'):
     """Our basic parser configurations
     """
     # joint
@@ -271,7 +275,7 @@ def _core_parsers(klearner, unique_real_root=True):
             ]
         ]
         # WIP with same-unit
-        if SAME_UNIT == 'joint':
+        if same_unit == 'joint':
             joint.extend([
                 mk_joint_su(klearner, d) for d in [
                     # decoder_last(),
@@ -282,7 +286,7 @@ def _core_parsers(klearner, unique_real_root=True):
                                         use_prob=True)),
                     ]
             ])
-        elif SAME_UNIT == 'preproc':
+        elif same_unit == 'preproc':
             joint.extend([
                 mk_su_joint(klearner, d) for d in [
                     # decoder_last(),
@@ -376,78 +380,191 @@ def _evaluations():
     maxent_klearner = LearnerConfig(attach=attach_learner_maxent(),
                                     label=label_learner_maxent())
     res.append(
-        EvaluationConfig(key='maxent-AD.L-jnt-eisner-NEW',
-                         settings=Settings(key='AD.L-jnt',
-                                           intra=False,
-                                           oracle=False,
-                                           children=None),
-                         learner=maxent_klearner,
-                         parser=Keyed('AD.L-jnt-eisner-NEW',
-                                      JointPipeline(
-                                          learner_attach=maxent_klearner.attach.payload,
-                                          learner_label=maxent_klearner.label.payload,
-                                          decoder=EisnerDecoder(unique_real_root=True, use_prob=True))))
+        EvaluationConfig(
+            key='maxent-AD.L-jnt-eisner',
+            settings=Settings(key='AD.L-jnt',
+                              intra=False,
+                              oracle=False,
+                              children=None),
+            learner=maxent_klearner,
+            parser=Keyed('AD.L-jnt-eisner',
+                         JointPipeline(
+                             learner_attach=maxent_klearner.attach.payload,
+                             learner_label=maxent_klearner.label.payload,
+                             decoder=EisnerDecoder(unique_real_root=True, use_prob=True))))
+    )
+
+    # maxent, eisner, AD.L-jnt then overwrite predicted "Same-Unit"
+    # FIXME "learner" might be wrong: this LearnerConfig has no mention of
+    # the same-unit classifier
+    maxent_su_learner = attach_learner_maxent()
+    # oracle_su_learner = Keyed('oracle', AttachOracle())  # alternative
+    res.append(
+        EvaluationConfig(
+            key='maxent-AD.L-jnt_su-eisner',
+            settings=Settings(key='AD.L-jnt_su',
+                              intra=False,
+                              oracle=False,
+                              children=None),
+            # FIXME ("attach", "label"), lacks "same_unit"
+            learner=maxent_klearner,
+            parser=Keyed('AD.L-jnt_su-eisner',
+                         JointSameUnitPipeline(
+                             learner_attach=maxent_klearner.attach.payload,
+                             learner_label=maxent_klearner.label.payload,
+                             learner_su=maxent_su_learner.payload,
+                             decoder=EisnerDecoder(unique_real_root=True, use_prob=True))))
     )
     # end WIP
-    learners = []
-    learners.extend(_LOCAL_LEARNERS)
-    # current structured learners don't do probs, hence non-prob decoders
-    nonprob_eisner = EisnerDecoder(use_prob=False)
-    learners.extend(l(nonprob_eisner) for l in _STRUCTURED_LEARNERS)
-    # MST is disabled by default, as it does not output projective trees
-    # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
-    # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
-    global_parsers = itr.chain.from_iterable(
-        _core_parsers(l) for l in learners)
-    res.extend(global_parsers)
+
+    if False:  # legacy code for one-step parsers
+        learners = []
+        learners.extend(_LOCAL_LEARNERS)
+        # current structured learners don't do probs, hence non-prob decoders
+        nonprob_eisner = EisnerDecoder(use_prob=False)
+        learners.extend(l(nonprob_eisner) for l in _STRUCTURED_LEARNERS)
+        # MST is disabled by default, as it does not output projective trees
+        # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
+        # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+        global_parsers = itr.chain.from_iterable(
+            _core_parsers(l, same_unit=SAME_UNIT) for l in learners)
+        res.extend(global_parsers)
 
     # == two-step parsers: intra then inter-sentential ==
-    ii_learners = []  # (intra, inter) learners
-    ii_learners.extend((copy.deepcopy(klearner), copy.deepcopy(klearner))
-                       for klearner in _LOCAL_LEARNERS
-                       if klearner != ORACLE)
-    # keep pointer to intra and inter oracles
-    ii_oracles = (copy.deepcopy(ORACLE), ORACLE_INTER)
-    ii_learners.append(ii_oracles)
-    # structured learners, cf. supra
-    intra_nonprob_eisner = EisnerDecoder(use_prob=False,
-                                         unique_real_root=True)
-    inter_nonprob_eisner = EisnerDecoder(use_prob=False,
-                                         unique_real_root=True)
-    ii_learners.extend((copy.deepcopy(l)(intra_nonprob_eisner),
-                        copy.deepcopy(l)(inter_nonprob_eisner))
-                       for l in _STRUCTURED_LEARNERS)
-    # couples of learners with either sentence- or document-level oracle
-    sorc_ii_learners = [
-        (ii_oracles[0], inter_lnr) for intra_lnr, inter_lnr in ii_learners
-        if (ii_oracles[0], inter_lnr) not in ii_learners
-    ]
-    dorc_ii_learners = [
-        (intra_lnr, ii_oracles[1]) for intra_lnr, inter_lnr in ii_learners
-        if (intra_lnr, ii_oracles[1]) not in ii_learners
-    ]
-    # enumerate pairs of (intra, inter) parsers
-    ii_pairs = []
-    for intra_lnr, inter_lnr in itr.chain(ii_learners,
-                                          sorc_ii_learners,
-                                          dorc_ii_learners):
-        # NEW intra parsers are explicitly authorized (in fact, expected)
-        # to have more than one real root ; this is necessary for the
-        # Eisner decoder and probably others, with "hard" strategies
-        # TODO add unique_real_root to hyperparameters in grid search
-        ii_pairs.extend(
-            IntraInterPair(intra=x, inter=y) for x, y in
-            zip(_core_parsers(intra_lnr, unique_real_root=True),
-                _core_parsers(inter_lnr, unique_real_root=True))
-        )
-    # cross-product: pairs of parsers x intra-/inter- configs
-    ii_parsers = [combine_intra(p, kconf,
-                                primary=('inter' if p.intra.settings.oracle
-                                         else 'intra'),
-                                verbose=_VERBOSE_INTRA_INTER)
-                  for p, kconf
-                  in itr.product(ii_pairs, _INTRA_INTER_CONFIGS)]
-    res.extend(ii_parsers)
+    # WIP explicit declaration
+    maxent_team_intra = LearnerConfig(attach=attach_learner_maxent(),
+                                      label=label_learner_maxent())
+    # FIXME ? maybe sel_inter='global' implies that
+    # maxent_team_inter = LearnerConfig(attach=maxent_klearner.attach, label=maxent_klearner.label)
+    maxent_team_inter = LearnerConfig(attach=attach_learner_maxent(),
+                                      label=label_learner_maxent())
+    res.append(
+        EvaluationConfig(
+            key='maxent-iheads-global-AD.L-jnt-eisner',
+            settings=Settings(key='iheads-global-AD.L-jnt',
+                              intra=True,
+                              oracle=False,
+                              children=IntraInterPair(
+                                  intra=Settings(key='AD.L-jnt',
+                                                 intra=False,
+                                                 oracle=False,
+                                                 children=None),
+                                  inter=Settings(key='AD.L-jnt',
+                                                 intra=False,
+                                                 oracle=False,
+                                                 children=None))),
+            learner=IntraInterPair(intra=maxent_team_intra,
+                                   inter=maxent_team_inter),
+            parser=Keyed('iheads-global-AD.L-jnt-eisner',
+                         HeadToHeadParser(
+                             IntraInterPair(
+                                 intra=JointPipeline(
+                                     learner_attach=maxent_team_intra.attach.payload,
+                                     learner_label=maxent_team_intra.label.payload,
+                                     decoder=EisnerDecoder(unique_real_root=True, use_prob=True)),
+                                 inter=JointPipeline(
+                                     learner_attach=maxent_team_inter.attach.payload,
+                                     learner_label=maxent_team_inter.label.payload,
+                                     decoder=EisnerDecoder(unique_real_root=True, use_prob=True))),
+                             sel_inter='global',
+                             verbose=_VERBOSE_INTRA_INTER)))
+    )
+
+    # maxent-iheads-global-AD.L-jnt_su-eisner
+    maxent_su_learner_intra = attach_learner_maxent()  # WIP
+    res.append(
+        EvaluationConfig(
+            key='maxent-iheads-global-AD.L-jnt_su-eisner',
+            settings=Settings(key='iheads-global-AD.L-jnt_su',
+                              intra=True,
+                              oracle=False,
+                              children=IntraInterPair(
+                                  intra=Settings(key='AD.L-jnt_su',
+                                                 intra=False,
+                                                 oracle=False,
+                                                 children=None),
+                                  inter=Settings(key='AD.L-jnt',
+                                                 intra=False,
+                                                 oracle=False,
+                                                 children=None))),
+            learner=IntraInterPair(intra=maxent_team_intra,
+                                   inter=maxent_team_inter),
+            parser=Keyed('iheads-global-AD.L-jnt_su-eisner',
+                         HeadToHeadParser(
+                             IntraInterPair(
+                                 intra=JointSameUnitPipeline(
+                                     learner_attach=maxent_team_intra.attach.payload,
+                                     learner_label=maxent_team_intra.label.payload,
+                                     learner_su=maxent_su_learner_intra.payload,
+                                     decoder=EisnerDecoder(unique_real_root=True, use_prob=True)),
+                                 inter=JointPipeline(
+                                     learner_attach=maxent_team_inter.attach.payload,
+                                     learner_label=maxent_team_inter.label.payload,
+                                     decoder=EisnerDecoder(unique_real_root=True, use_prob=True))),
+                             sel_inter='global',
+                             verbose=_VERBOSE_INTRA_INTER)))
+    )
+    # end WIP
+
+    if False:  # disable legacy code for 2-step parsers
+        ii_learners = []  # (intra, inter) learners
+        ii_learners.extend((copy.deepcopy(klearner), copy.deepcopy(klearner))
+                           for klearner in _LOCAL_LEARNERS
+                           if klearner != ORACLE)
+        # keep pointer to intra and inter oracles
+        ii_oracles = (copy.deepcopy(ORACLE), ORACLE_INTER)
+        ii_learners.append(ii_oracles)
+        # structured learners, cf. supra
+        intra_nonprob_eisner = EisnerDecoder(use_prob=False,
+                                             unique_real_root=True)
+        inter_nonprob_eisner = EisnerDecoder(use_prob=False,
+                                             unique_real_root=True)
+
+        ii_learners.extend((copy.deepcopy(l)(intra_nonprob_eisner),
+                            copy.deepcopy(l)(inter_nonprob_eisner))
+                           for l in _STRUCTURED_LEARNERS)
+        # couples of learners with either sentence- or document-level oracle
+        sorc_ii_learners = [
+            (ii_oracles[0], inter_lnr) for intra_lnr, inter_lnr in ii_learners
+            if (ii_oracles[0], inter_lnr) not in ii_learners
+        ]
+        dorc_ii_learners = [
+            (intra_lnr, ii_oracles[1]) for intra_lnr, inter_lnr in ii_learners
+            if (intra_lnr, ii_oracles[1]) not in ii_learners
+        ]
+        # enumerate pairs of (intra, inter) parsers
+        ii_pairs = []
+        for intra_lnr, inter_lnr in itr.chain(ii_learners,
+                                              sorc_ii_learners,
+                                              dorc_ii_learners):
+            # NEW intra parsers are explicitly authorized (in fact, expected)
+            # to have more than one real root ; this is necessary for the
+            # Eisner decoder and probably others, with "hard" strategies
+            # TODO add unique_real_root to hyperparameters in grid search
+            intra_parsers = _core_parsers(intra_lnr, unique_real_root=True,
+                                          same_unit=SAME_UNIT)
+            # same-unit is undefined for inter, in the RST-DT corpus
+            # (at least in our implementation)
+            inter_parsers = _core_parsers(inter_lnr, unique_real_root=True,
+                                          same_unit='no')
+            if SAME_UNIT != 'no':
+                # inter_parsers would be twice less numerous than intra_parsers
+                # => dirty hack: double the inter parsers
+                inter_parsers = inter_parsers + inter_parsers
+
+            ii_pairs.extend(IntraInterPair(intra=x, inter=y) for x, y
+                            # FIXME should probably not be a zip(), cf dirty hack
+                            # above
+                            in zip(intra_parsers, inter_parsers)
+            )
+        # cross-product: pairs of parsers x intra-/inter- configs
+        ii_parsers = [combine_intra(p, kconf,
+                                    primary=('inter' if p.intra.settings.oracle
+                                             else 'intra'),
+                                    verbose=_VERBOSE_INTRA_INTER)
+                      for p, kconf
+                      in itr.product(ii_pairs, _INTRA_INTER_CONFIGS)]
+        res.extend(ii_parsers)
 
     return [x for x in res if not _is_junk(x)]
 
