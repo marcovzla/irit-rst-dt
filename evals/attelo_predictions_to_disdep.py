@@ -88,13 +88,12 @@ if __name__ == '__main__':
                                   '*.edu-pairs.sparse.edu_input')
     edges_file_glob = os.path.join('TMP', 'latest', 'scratch-current',
                                    'combined', 'output.*')
-    out_dir = 'TMP_disdep_chain_pred_ours'
     # attelo predictions are currently stored in one big file
     edges_files = glob(edges_file_glob)
     assert len(edges_files) == 1
     edges_file = edges_files[0]
     # paths to the resulting disdep files
-    out_dir = os.path.join(out_dir, 'TEST')
+    out_dir = os.path.join('TMP_disdep', 'chain', 'ours', 'test')
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     # do the conversion

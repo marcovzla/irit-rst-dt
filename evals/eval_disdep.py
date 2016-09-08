@@ -5,6 +5,7 @@ their combinations.
 """
 
 from __future__ import absolute_import, print_function
+import argparse
 import codecs
 import csv
 from glob import glob
@@ -12,9 +13,24 @@ import os
 
 
 if __name__ == '__main__':
-    # TODO turn into argparse params
-    dir_true = os.path.join('TMP_disdep_chain_true', 'TEST')
-    dir_pred = os.path.join('TMP_disdep_chain_pred_ours', 'TEST')
+    parser = argparse.ArgumentParser(
+        description="Evaluate dis_dep trees against a given reference")
+    parser.add_argument('author_pred',
+                        choices=['gold', 'silver',
+                                 'joty', 'feng', 'ji',
+                                 'ours'],
+                        help="Author of the predictions")
+    parser.add_argument('--author_true', default='gold',
+                        choices=['gold', 'silver',
+                                 'joty', 'feng', 'ji',
+                                 'ours'],
+                        help="Author of the reference")
+    args = parser.parse_args()
+    author_true = args.author_true
+    author_pred = args.author_pred
+    # TODO add argparse params for nary_enc and split
+    dir_true = os.path.join('TMP_disdep', 'chain', author_true, 'test')
+    dir_pred = os.path.join('TMP_disdep', 'chain', author_pred, 'test')
     # end TODO
     files_true = {os.path.basename(f).rsplit('.')[0]: f
                   for f in glob(os.path.join(dir_true, '*.dis_dep'))}
