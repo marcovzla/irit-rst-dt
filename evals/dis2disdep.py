@@ -15,6 +15,7 @@ import os
 from educe.corpus import FileId
 from educe.learning.disdep_format import dump_disdep_files
 from educe.rst_dt.codra import load_codra_output_files
+from educe.rst_dt.feng import load_feng_output_files
 from educe.rst_dt.corpus import Reader
 from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.rst_wsj_corpus import (DOUBLE_FOLDER, TEST_FOLDER,
@@ -91,8 +92,18 @@ def main():
         for doc_name, dtree in dtrees.items():
             dtree.origin = FileId(doc_name, None, None, None)
     elif author == 'feng':
-        # files_glob = os.path.join(OUT_FENG, '*.txt.dis')  # FIXME
-        raise NotImplementedError("Output of Feng's parser")
+        if corpus_split != 'test':
+            raise ValueError("The output of Feng & Hirst's parser is "
+                             "available for the 'test' split only")
+        data_pred = load_feng_output_files(OUT_FENG)
+        doc_names = data_pred['doc_names']
+        rtrees = data_pred['rst_ctrees']
+        dtrees = {doc_name: RstDepTree.from_rst_tree(rtree, nary_enc=nary_enc)
+                  for doc_name, rtree in zip(doc_names, rtrees)}
+        # set reference to the document in the RstDepTree (required by
+        # dump_disdep_files)
+        for doc_name, dtree in dtrees.items():
+            dtree.origin = FileId(doc_name, None, None, None)
     elif author == 'ji':
         raise NotImplementedError("Output of Ji's parser")
     # do dump
