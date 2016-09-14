@@ -147,6 +147,11 @@ SAME_UNIT = 'joint'  # one of {'joint', 'preproc', 'no'}
 Whether to have a special processing for same-unit
 """
 
+NARY_ENC = 'tree'  # one of {'chain', 'tree'}
+"""
+Encoding for n-ary nodes in the ctree.
+"""
+
 FIXED_FOLD_FILE = None
 # FIXED_FOLD_FILE = 'folds-TRAINING.json'
 """

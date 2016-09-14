@@ -16,7 +16,7 @@ from attelo.parser.same_unit import SameUnitClassifierWrapper
 
 from ..local import (FEATURE_SET, LABEL_SET, TEST_CORPUS, TRAINING_CORPUS,
                      SAME_UNIT, PTB_DIR, CORENLP_OUT_DIR, LECSIE_DATA_DIR,
-                     EVALUATIONS)
+                     NARY_ENC, EVALUATIONS)
 from ..util import (current_tmp, latest_tmp)
 
 NAME = 'gather'
@@ -86,6 +86,7 @@ def extract_features(corpus, output_dir, fix_pseudo_rels, instances,
         PTB_DIR,  # TODO make this optional and exclusive from CoreNLP
         output_dir,
         '--feature_set', FEATURE_SET,
+        '--nary_enc', NARY_ENC,  # 2016-09-12
         '--instances', instances,
     ]
     # NEW 2016-05-19 rewrite pseudo-relations
