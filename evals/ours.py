@@ -15,6 +15,7 @@ from educe.rst_dt.annotation import (EDU as EduceEDU,
 from educe.rst_dt.corpus import (Reader as RstReader,
                                  RstRelationConverter as RstRelationConverter)
 from educe.rst_dt.dep2con import (deptree_to_simple_rst_tree,
+                                  deptree_to_rst_tree,
                                   DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 from educe.rst_dt.deptree import RstDepTree, RstDtException
@@ -79,8 +80,11 @@ def load_attelo_output_file(output_file):
 
 
 def load_deptrees_from_attelo_output(output_file, edus_file,
+                                     nary_enc,
                                      nuc_strategy, rank_strategy,
                                      prioritize_same_unit=True,
+                                     order='weak',
+                                     binarize_ref=False,
                                      detailed=False,
                                      skpd_docs=None):
     """Load an RstDepTree from the output of attelo.
@@ -115,12 +119,15 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
 
         # transform into binary tree with coarse-grained labels
         coarse_rtree_true = REL_CONV(rtree_true)
-        bin_rtree_true = _binarize(coarse_rtree_true)
-        ctree_true[doc_name] = bin_rtree_true
+        if binarize_ref:
+            bin_rtree_true = _binarize(coarse_rtree_true)
+            ct_true = bin_rtree_true
+        else:
+            ct_true = coarse_rtree_true
+        ctree_true[doc_name] = ct_true
 
-        # transform into dependency tree via SimpleRSTTree
-        bin_srtree_true = SimpleRSTTree.from_rst_tree(coarse_rtree_true)
-        dt_true = RstDepTree.from_simple_rst_tree(bin_srtree_true)
+        # transform into dependency tree
+        dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
         dtree_true[doc_name] = dt_true
 
         # 2016-06-28 retrieve paragraph idx of each EDU
@@ -206,7 +213,8 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     # ranking classifier
     rank_classifier = InsideOutAttachmentRanker(
         strategy=rank_strategy,
-        prioritize_same_unit=prioritize_same_unit)
+        prioritize_same_unit=prioritize_same_unit,
+        order=order)
     rank_classifier.fit(X_train, y_rank_train)
 
     # rebuild RstDepTrees
@@ -245,14 +253,13 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
 
         # create pred ctree
         try:
-            bin_srtree_pred = deptree_to_simple_rst_tree(dt_pred)
-            if False:  # EXPERIMENTAL
-                # currently False to run on output that already has
-                # labels embedding nuclearity
-                bin_srtree_pred = SimpleRSTTree.incorporate_nuclearity_into_label(
-                    bin_srtree_pred)
-            bin_rtree_pred = SimpleRSTTree.to_binary_rst_tree(bin_srtree_pred)
-            ctree_pred[doc_name] = bin_rtree_pred
+            if False:
+                rtree_pred = deptree_to_rst_tree(dt_pred)
+                ctree_pred[doc_name] = rtree_pred
+            else:  # legacy: via SimpleRSTTree, forces binarization
+                bin_srtree_pred = deptree_to_simple_rst_tree(dt_pred)
+                bin_rtree_pred = SimpleRSTTree.to_binary_rst_tree(bin_srtree_pred)
+                ctree_pred[doc_name] = bin_rtree_pred
         except RstDtException as rst_e:
             print(rst_e)
             skipped_docs.add(doc_name)

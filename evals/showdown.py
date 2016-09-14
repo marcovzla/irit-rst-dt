@@ -46,6 +46,14 @@ EISNER_OUT_SYN_PRED = os.path.join(
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
+# 2016-09-14 "tree" transform, predicted syntax
+EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
+    '/home/mmorey/melodi',
+    'irit-rst-dt/TMP/latest',  # lbl
+    'scratch-current/combined',
+    'output.maxent-iheads-global-AD.L-jnt_su-eisner')
+# end 2016-09-14
+
 EISNER_OUT_SYN_PRED_SU = os.path.join(
     '/home/mmorey/melodi',
     'irit-rst-dt/TMP/latest',  # lbl
@@ -58,7 +66,7 @@ EISNER_OUT_SYN_GOLD = os.path.join(
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
-CODRA_OUT_DIR = '/home/mmorey/melodi/joty/Doc-level'
+CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 
 
 
@@ -70,28 +78,46 @@ CODRA_OUT_DIR = '/home/mmorey/melodi/joty/Doc-level'
 
 print('CODRA (Joty)')
 eval_codra_output(CODRA_OUT_DIR, EDUS_FILE,
+                  'chain',
                   nuc_strategy="unamb_else_most_frequent",
-                  rank_strategy='closest-intra-rl-inter-rl',
+                  rank_strategy='sdist-edist-rl',
                   prioritize_same_unit=True,
-                  detailed=True)
+                  binarize_ref=False,
+                  detailed=False)
 print('=======================')
 
-print('Eisner, predicted syntax')
+print('[chain] Eisner, predicted syntax')
 load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                 'chain',
                                  nuc_strategy="unamb_else_most_frequent",
                                  # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='closest-intra-rl-inter-rl',
+                                 rank_strategy='sdist-edist-rl',
                                  prioritize_same_unit=True,
-                                 detailed=True)
+                                 order='weak',
+                                 binarize_ref=False,
+                                 detailed=False)
+print('======================')
+
+print('[tree] Eisner, predicted syntax + same-unit')
+load_deptrees_from_attelo_output(EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
+                                 'tree',
+                                 nuc_strategy="unamb_else_most_frequent",
+                                 # nuc_strategy="most_frequent_by_rel",
+                                 rank_strategy='sdist-edist-rl',
+                                 prioritize_same_unit=True,
+                                 order='weak',
+                                 binarize_ref=False,
+                                 detailed=False)
 print('======================')
 
 print('Eisner, predicted syntax + same-unit')
 load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                                 'chain',
                                  nuc_strategy="unamb_else_most_frequent",
                                  # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='closest-intra-rl-inter-rl',
+                                 rank_strategy='sdist-edist-rl',
                                  prioritize_same_unit=True,
-                                 detailed=True)
+                                 detailed=False)
 print('======================')
 
 print('Eisner, gold syntax')

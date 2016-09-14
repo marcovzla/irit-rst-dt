@@ -41,8 +41,10 @@ REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
 
 
 def eval_codra_output(codra_out_dir, edus_file,
+                      nary_enc,
                       nuc_strategy, rank_strategy,
                       prioritize_same_unit=True,
+                      binarize_ref=False,
                       detailed=False):
     """Load and evaluate the .dis files output by CODRA.
 
@@ -77,12 +79,15 @@ def eval_codra_output(codra_out_dir, edus_file,
 
         # transform into binary tree with coarse-grained labels
         coarse_rtree_true = REL_CONV(rtree_true)
-        bin_rtree_true = _binarize(coarse_rtree_true)
-        ctree_true[doc_name] = bin_rtree_true
+        if binarize_ref:
+            bin_rtree_true = _binarize(coarse_rtree_true)
+            ct_true = bin_rtree_true
+        else:
+            ct_true = coarse_rtree_true
+        ctree_true[doc_name] = ct_true
 
         # transform into dependency tree via SimpleRSTTree
-        bin_srtree_true = SimpleRSTTree.from_rst_tree(coarse_rtree_true)
-        dt_true = RstDepTree.from_simple_rst_tree(bin_srtree_true)
+        dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
         dtree_true[doc_name] = dt_true
 
         # WIP 2016-06-29 para_idx
@@ -131,8 +136,7 @@ def eval_codra_output(codra_out_dir, edus_file,
 
         # dependency tree
         # conversion via SimpleRSTTree to RstDepTree
-        bin_srtree_pred = SimpleRSTTree.from_rst_tree(coarse_rtree_pred)
-        dt_pred = RstDepTree.from_simple_rst_tree(bin_srtree_pred)
+        dt_pred = RstDepTree.from_rst_tree(coarse_rtree_pred, nary_enc='chain')
         dtree_pred[doc_name] = dt_pred
 
     # compare pred and true
