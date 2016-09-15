@@ -5,19 +5,13 @@
 from __future__ import print_function
 
 from collections import defaultdict
-import os
 
 import numpy as np
 
 from educe.annotation import Span as EduceSpan
-from educe.rst_dt.annotation import (EDU as EduceEDU,
-                                     SimpleRSTTree, _binarize)
-from educe.rst_dt.corpus import (Reader as RstReader,
-                                 RstRelationConverter as RstRelationConverter)
+from educe.rst_dt.annotation import (EDU as EduceEDU, SimpleRSTTree)
 from educe.rst_dt.dep2con import (deptree_to_simple_rst_tree,
-                                  deptree_to_rst_tree,
-                                  DummyNuclearityClassifier,
-                                  InsideOutAttachmentRanker)
+                                  deptree_to_rst_tree)
 from educe.rst_dt.deptree import RstDepTree, RstDtException
 from educe.rst_dt.document_plus import align_edus_with_paragraphs
 #
@@ -26,20 +20,6 @@ from attelo.metrics.constituency import (parseval_detailed_report,
                                          parseval_report)
 from attelo.metrics.deptree import compute_uas_las
 from attelo.table import UNRELATED  # for load_attelo_output_file
-
-
-# RST corpus
-CORPUS_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    '..', 'corpus',
-    'RSTtrees-WSJ-main-1.0/'))
-CD_TRAIN = os.path.join(CORPUS_DIR, 'TRAINING')
-CD_TEST = os.path.join(CORPUS_DIR, 'TEST')
-# relation converter (fine- to coarse-grained labels)
-RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
-                           'educe', 'rst_dt',
-                           'rst_112to18.txt')
-REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
 
 
 # move to attelo.datasets.attelo_out_format
@@ -79,24 +59,25 @@ def load_attelo_output_file(output_file):
     return edges_pred
 
 
-def load_deptrees_from_attelo_output(output_file, edus_file,
-                                     nary_enc,
-                                     nuc_strategy, rank_strategy,
-                                     prioritize_same_unit=True,
-                                     order='weak',
-                                     binarize_ref=False,
+def load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                     output_file, edus_file,
+                                     nuc_clf, rnk_clf,
                                      detailed=False,
                                      skpd_docs=None):
     """Load an RstDepTree from the output of attelo.
 
     Parameters
     ----------
+    ctree_true: dict(str, RSTTree)
+        Ground truth RST ctree.
+    dtree_true: dict(str, RstDepTree)
+        Ground truth RST (ordered) dtree.
     output_file: string
         Path to the file that contains attelo's output
-    nuc_strategy: string
-        Strategy to predict nuclearity
-    rank_strategy: string
-        Strategy to predict attachment ranking
+    nuc_clf: NuclearityClassifier
+        Classifier to predict nuclearity
+    rnk_clf: RankClassifier
+        Classifier to predict attachment ranking
     skpd_docs: set(string)
         Names of documents that should be skipped to compute scores
 
@@ -108,28 +89,7 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     doc_name2edu2para = dict()
 
     # load reference trees
-    dtree_true = dict()  # dependency trees
-    ctree_true = dict()  # constituency trees
-    # FIXME: find ways to read the right (not necessarily TEST) section
-    # and only the required documents
-    rst_reader = RstReader(CD_TEST)
-    rst_corpus = rst_reader.slurp()
-    for doc_id, rtree_true in sorted(rst_corpus.items()):
-        doc_name = doc_id.doc
-
-        # transform into binary tree with coarse-grained labels
-        coarse_rtree_true = REL_CONV(rtree_true)
-        if binarize_ref:
-            bin_rtree_true = _binarize(coarse_rtree_true)
-            ct_true = bin_rtree_true
-        else:
-            ct_true = coarse_rtree_true
-        ctree_true[doc_name] = ct_true
-
-        # transform into dependency tree
-        dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
-        dtree_true[doc_name] = dt_true
-
+    for doc_name, rtree_true in sorted(ctree_true.items()):
         # 2016-06-28 retrieve paragraph idx of each EDU
         # FIXME refactor to get in a better way, in a better place
         # currently, we take EDUs from the RSTTree and paragraphs from
@@ -198,25 +158,6 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     # re-build predicted trees from predicted edges and educe EDUs
     skipped_docs = set()  # docs skipped because non-projective structures
 
-    # classifiers for nuclearity and ranking
-    # FIXME declare, fit and predict upstream...
-    X_train = []
-    y_nuc_train = []
-    y_rank_train = []
-    for doc_name, dt in sorted(dtree_true.items()):
-        X_train.append(dt)
-        y_nuc_train.append(dt.nucs)
-        y_rank_train.append(dt.ranks)
-    # nuclearity
-    nuc_classifier = DummyNuclearityClassifier(strategy=nuc_strategy)
-    nuc_classifier.fit(X_train, y_nuc_train)
-    # ranking classifier
-    rank_classifier = InsideOutAttachmentRanker(
-        strategy=rank_strategy,
-        prioritize_same_unit=prioritize_same_unit,
-        order=order)
-    rank_classifier.fit(X_train, y_rank_train)
-
     # rebuild RstDepTrees
     for doc_name, es_pred in sorted(edges_pred.items()):
         # get educe EDUs
@@ -233,7 +174,7 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
                 dt_pred.add_dependency(gid2num[src_id], gid2num[tgt_id], lbl)
         # NEW add nuclearity: heuristic baseline
         if True:
-            dt_pred.nucs = nuc_classifier.predict([dt_pred])[0]
+            dt_pred.nucs = nuc_clf.predict([dt_pred])[0]
         else:  # EXPERIMENTAL use gold nuclearity
             dt_pred.nucs = dtree_true[doc_name].nucs
         # NEW add rank: some strategies require a mapping from EDU to sentence
@@ -247,13 +188,14 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
         # end EXPERIMENTAL
         if False:  # DEBUG
             print(doc_name)
-        dt_pred.ranks = rank_classifier.predict([dt_pred])[0]
+        dt_pred.ranks = rnk_clf.predict([dt_pred])[0]
         # end NEW
         dtree_pred[doc_name] = dt_pred
 
         # create pred ctree
         try:
-            if False:
+            if True:  # NEW 2016-09-14
+                # direct conversion from ordered dtree to ctree
                 rtree_pred = deptree_to_rst_tree(dt_pred)
                 ctree_pred[doc_name] = rtree_pred
             else:  # legacy: via SimpleRSTTree, forces binarization
@@ -303,5 +245,6 @@ def load_deptrees_from_attelo_output(output_file, edus_file,
     if detailed:
         print(parseval_detailed_report(ctree_true, ctree_pred,
                                        metric_type='S+R'))
-
+    # DEBUG
+    # end DEBUG
     return skipped_docs

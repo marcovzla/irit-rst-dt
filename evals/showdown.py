@@ -7,11 +7,12 @@ from __future__ import print_function
 
 import os
 
-# from educe.rst_dt.annotation import RSTTree, SimpleRSTTree, _binarize
-from educe.rst_dt.corpus import RstRelationConverter # , Reader as RstReader
-
-# from educe.rst_dt.dep2con import (deptree_to_simple_rst_tree)
-# from educe.rst_dt.deptree import (RstDepTree, RstDtException)
+from educe.rst_dt.annotation import _binarize
+from educe.rst_dt.corpus import (RstRelationConverter,
+                                 Reader as RstReader)
+from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
+                                  InsideOutAttachmentRanker)
+from educe.rst_dt.deptree import RstDepTree
 #
 # from attelo.metrics.constituency import (LBL_FNS, parseval_detailed_report,
 #                                          parseval_report)
@@ -54,6 +55,7 @@ EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
     'output.maxent-iheads-global-AD.L-jnt_su-eisner')
 # end 2016-09-14
 
+
 EISNER_OUT_SYN_PRED_SU = os.path.join(
     '/home/mmorey/melodi',
     'irit-rst-dt/TMP/latest',  # lbl
@@ -69,67 +71,117 @@ EISNER_OUT_SYN_GOLD = os.path.join(
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 
 
+# hyperparams
+NUC_STRATEGY = 'unamb_else_most_frequent'
+RNK_STRATEGY = 'sdist-edist-rl'
+RNK_PRIORITY_SU = True
+RNK_ORDER = 'weak'
+
 
 # FIXME:
-# * [ ] load gold trees here once and for all, pass them to each evaluation
 # * [ ] create summary table with one system per row, one metric per column,
 #   keep only the f-score (because for binary trees with manual segmentation
 #   precision = recall = f-score).
 
-print('CODRA (Joty)')
-eval_codra_output(CODRA_OUT_DIR, EDUS_FILE,
-                  'chain',
-                  nuc_strategy="unamb_else_most_frequent",
-                  rank_strategy='sdist-edist-rl',
-                  prioritize_same_unit=True,
-                  binarize_ref=False,
-                  detailed=False)
-print('=======================')
+# 1. load train section of the RST corpus, fit (currently dummy) classifiers
+# for nuclearity and rank
+reader_train = RstReader(CD_TRAIN)
+corpus_train = reader_train.slurp()
+# gold RST trees
+ctree_true = dict()  # ctrees
+ctree_bin_true = dict()  # ctrees, binarized
+dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
+dtree_bin_true = dict()  # dtrees from the binarized ctrees ('chain' transform)
+for doc_id, ct_true in sorted(corpus_train.items()):
+    doc_name = doc_id.doc
+    # flavours of ctree
+    ct_true = REL_CONV(ct_true)  # map fine to coarse relations
+    ctree_true[doc_name] = ct_true
+    ct_bin_true = _binarize(ct_true)
+    ctree_bin_true[doc_name] = ct_bin_true
+    # flavours of dtree
+    dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc='tree')
+    dt_bin_true = RstDepTree.from_rst_tree(ct_true, nary_enc='chain')
+    # alt:
+    # dt_bin_true = RstDepTree.from_rst_tree(ct_bin_true, nary_enc='chain')
+    dtree_true[doc_name] = dt_true
+    dtree_bin_true[doc_name] = dt_bin_true
+# fit classifiers for nuclearity and rank (DIRTY)
+# NB: both are (dummily) fit on weakly ordered dtrees
+X_train = []
+y_nuc_train = []
+y_rnk_train = []
+for doc_name, dt in sorted(dtree_true.items()):
+    X_train.append(dt)
+    y_nuc_train.append(dt.nucs)
+    y_rnk_train.append(dt.ranks)
+# nuclearity clf
+nuc_clf = DummyNuclearityClassifier(strategy=NUC_STRATEGY)
+nuc_clf.fit(X_train, y_nuc_train)
+# rank clf
+rnk_clf = InsideOutAttachmentRanker(strategy=RNK_STRATEGY,
+                                    prioritize_same_unit=RNK_PRIORITY_SU,
+                                    order=RNK_ORDER)
+rnk_clf.fit(X_train, y_rnk_train)
 
-print('[chain] Eisner, predicted syntax')
-load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                 'chain',
-                                 nuc_strategy="unamb_else_most_frequent",
-                                 # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='sdist-edist-rl',
-                                 prioritize_same_unit=True,
-                                 order='weak',
-                                 binarize_ref=False,
-                                 detailed=False)
-print('======================')
+# load test section of the RST corpus
+reader_test = RstReader(CD_TEST)
+corpus_test = reader_test.slurp()
+# gold RST trees
+ctree_true = dict()  # ctrees
+ctree_bin_true = dict()  # ctrees, binarized
+dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
+dtree_bin_true = dict()  # dtrees from the binarized ctrees ('chain' transform)
+for doc_id, ct_true in sorted(corpus_test.items()):
+    doc_name = doc_id.doc
+    # flavours of ctree
+    ct_true = REL_CONV(ct_true)  # map fine to coarse relations
+    ctree_true[doc_name] = ct_true
+    ct_bin_true = _binarize(ct_true)
+    ctree_bin_true[doc_name] = ct_bin_true
+    # flavours of dtree
+    dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc='tree')
+    dt_bin_true = RstDepTree.from_rst_tree(ct_true, nary_enc='chain')
+    # alt:
+    # dt_bin_true = RstDepTree.from_rst_tree(ct_bin_true, nary_enc='chain')
+    dtree_true[doc_name] = dt_true
+    dtree_bin_true[doc_name] = dt_bin_true
 
-print('[tree] Eisner, predicted syntax + same-unit')
-load_deptrees_from_attelo_output(EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
-                                 'tree',
-                                 nuc_strategy="unamb_else_most_frequent",
-                                 # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='sdist-edist-rl',
-                                 prioritize_same_unit=True,
-                                 order='weak',
-                                 binarize_ref=False,
-                                 detailed=False)
-print('======================')
+
+if True:
+    print('CODRA (Joty)')
+    eval_codra_output(ctree_true, dtree_true,
+                      CODRA_OUT_DIR, EDUS_FILE,
+                      nuc_clf, rnk_clf,
+                      detailed=False)
+    print('=======================')
+
+if True:
+    print('[chain] Eisner, predicted syntax')
+    load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                     EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                     nuc_clf, rnk_clf,
+                                     detailed=False)
+    print('======================')
+
+if True:
+    print('[tree] Eisner, predicted syntax + same-unit')
+    load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                     EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
+                                     nuc_clf, rnk_clf,
+                                     detailed=False)
+    print('======================')
 
 print('Eisner, predicted syntax + same-unit')
-load_deptrees_from_attelo_output(EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
-                                 'chain',
-                                 nuc_strategy="unamb_else_most_frequent",
-                                 # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='sdist-edist-rl',
-                                 prioritize_same_unit=True,
+load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                 EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                                 nuc_clf, rnk_clf,
                                  detailed=False)
 print('======================')
 
 print('Eisner, gold syntax')
-load_deptrees_from_attelo_output(EISNER_OUT_SYN_GOLD, EDUS_FILE,
-                                 nuc_strategy="unamb_else_most_frequent",
-                                 # nuc_strategy="most_frequent_by_rel",
-                                 rank_strategy='closest-intra-rl-inter-rl',
-                                 prioritize_same_unit=True)
+load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                 EISNER_OUT_SYN_GOLD, EDUS_FILE,
+                                 nuc_clf, rnk_clf,
+                                 detailed=False)
 print('======================')
-
-
-# TODO use nuclearity classifier
-# starting with baseline: DummyNuclearityClassifier, that assigns to each
-# EDU the most frequent nuclearity of its (incoming) relation in the
-# training corpus, i.e. 'S' for 'NS', 'N' for 'NN'
