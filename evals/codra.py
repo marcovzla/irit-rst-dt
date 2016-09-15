@@ -22,7 +22,9 @@ from attelo.metrics.deptree import compute_uas_las
 
 def eval_codra_output(ctree_true, dtree_true,
                       codra_out_dir, edus_file,
-                      nuc_clf, rnk_clf,
+                      rel_conv=None,
+                      nary_enc='chain',
+                      nuc_clf=None, rnk_clf=None,
                       detailed=False):
     """Load and evaluate the .dis files output by CODRA.
 
@@ -80,15 +82,16 @@ def eval_codra_output(ctree_true, dtree_true,
     dtree_pred = dict()  # dependency trees
     ctree_pred = dict()  # constituency trees
 
-    for doc_name, rst_ctree in itertools.izip(doc_names_pred, rst_ctrees_pred):
+    for doc_name, ct_pred in itertools.izip(doc_names_pred, rst_ctrees_pred):
         # constituency tree
         # replace fine-grained labels with coarse-grained labels
         # no need to replace labels: the files we have already contain
         # the coarse labels
-        coarse_rtree_pred = rst_ctree
-        ctree_pred[doc_name] = coarse_rtree_pred
+        if rel_conv is not None:
+            ct_pred = rel_conv(ct_pred)
+        ctree_pred[doc_name] = ct_pred
         # convert to weakly-ordered dependency tree
-        dt_pred = RstDepTree.from_rst_tree(coarse_rtree_pred, nary_enc='chain')
+        dt_pred = RstDepTree.from_rst_tree(ct_pred, nary_enc='chain')
         dtree_pred[doc_name] = dt_pred
 
     # compare pred and true
@@ -119,7 +122,7 @@ def eval_codra_output(ctree_true, dtree_true,
         print(parseval_detailed_report(ctree_true, ctree_pred,
                                        metric_type='S+R'))
 
-    if True:
+    if nuc_clf is not None and rnk_clf is not None:
         # WIP 2016-06-29 use our deterministic classifiers for nuc and rank
         # => estimate degradation on Joty's output => hint at ours
         # nuclearity

@@ -152,7 +152,9 @@ if True:
     print('CODRA (Joty)')
     eval_codra_output(ctree_true, dtree_true,
                       CODRA_OUT_DIR, EDUS_FILE,
-                      nuc_clf, rnk_clf,
+                      rel_conv=REL_CONV,
+                      nary_enc='chain',
+                      nuc_clf=nuc_clf, rnk_clf=rnk_clf,
                       detailed=False)
     print('=======================')
 
