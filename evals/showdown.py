@@ -5,6 +5,7 @@ Included are dependency and constituency tree metrics.
 
 from __future__ import print_function
 
+import argparse
 import os
 
 from educe.rst_dt.annotation import _binarize
@@ -14,8 +15,10 @@ from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 from educe.rst_dt.deptree import RstDepTree
 #
-# from attelo.metrics.constituency import (LBL_FNS, parseval_detailed_report,
-#                                          parseval_report)
+from attelo.metrics.constituency import (parseval_detailed_report,
+                                         parseval_report)
+from attelo.metrics.deptree import compute_uas_las
+
 # local to this package
 from evals.codra import eval_codra_output
 from evals.ours import load_deptrees_from_attelo_output
@@ -70,7 +73,8 @@ EISNER_OUT_SYN_GOLD = os.path.join(
 
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 
-
+# level of detail for parseval
+DETAILED = False
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
 RNK_STRATEGY = 'sdist-edist-rl'
@@ -78,112 +82,206 @@ RNK_PRIORITY_SU = True
 RNK_ORDER = 'weak'
 
 
+def setup_dtree_postprocessor(nary_enc):
+    """Setup the nuclearity and rank classifiers to flesh out dtrees."""
+    # load train section of the RST corpus, fit (currently dummy) classifiers
+    # for nuclearity and rank
+    reader_train = RstReader(CD_TRAIN)
+    corpus_train = reader_train.slurp()
+    # gold RST trees
+    ctree_true = dict()  # ctrees
+    dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
+
+    for doc_id, ct_true in sorted(corpus_train.items()):
+        doc_name = doc_id.doc
+        # flavours of ctree
+        ct_true = REL_CONV(ct_true)  # map fine to coarse relations
+        ctree_true[doc_name] = ct_true
+        # flavours of dtree
+        dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
+        dtree_true[doc_name] = dt_true
+    # fit classifiers for nuclearity and rank (DIRTY)
+    # NB: both are (dummily) fit on weakly ordered dtrees
+    X_train = []
+    y_nuc_train = []
+    y_rnk_train = []
+    for doc_name, dt in sorted(dtree_true.items()):
+        X_train.append(dt)
+        y_nuc_train.append(dt.nucs)
+        y_rnk_train.append(dt.ranks)
+    # nuclearity clf
+    nuc_clf = DummyNuclearityClassifier(strategy=NUC_STRATEGY)
+    nuc_clf.fit(X_train, y_nuc_train)
+    # rank clf
+    rnk_clf = InsideOutAttachmentRanker(strategy=RNK_STRATEGY,
+                                        prioritize_same_unit=RNK_PRIORITY_SU,
+                                        order=RNK_ORDER)
+    rnk_clf.fit(X_train, y_rnk_train)
+    return nuc_clf, rnk_clf
+
+
 # FIXME:
 # * [ ] create summary table with one system per row, one metric per column,
 #   keep only the f-score (because for binary trees with manual segmentation
 #   precision = recall = f-score).
+def main():
+    """Run the eval"""
+    parser = argparse.ArgumentParser(
+        description="Evaluate parsers' output against a given reference")
+    # predictions
+    parser.add_argument('authors_pred', nargs='+',
+                        choices=['gold', 'silver',
+                                 'joty', 'feng', 'ji',
+                                 'ours_chain', 'ours_tree'],
+                        help="Author(s) of the predictions")
+    parser.add_argument('--nary_enc_pred', default='tree',
+                        choices=['tree', 'chain'],
+                        help="Encoding of n-ary nodes for the predictions")
+    # reference
+    parser.add_argument('--author_true', default='gold',
+                        choices=['gold', 'silver',
+                                 'joty', 'feng', 'ji',
+                                 'ours_chain', 'ours_tree'],
+                        help="Author of the reference")
+    # * dtree eval
+    parser.add_argument('--nary_enc_true', default='tree',
+                        choices=['tree', 'chain'],
+                        help="Encoding of n-ary nodes for the reference")
+    # * ctree eval
+    parser.add_argument('--binarize_true', action='store_true',
+                        help="Binarize the reference ctree for the eval")
 
-# 1. load train section of the RST corpus, fit (currently dummy) classifiers
-# for nuclearity and rank
-reader_train = RstReader(CD_TRAIN)
-corpus_train = reader_train.slurp()
-# gold RST trees
-ctree_true = dict()  # ctrees
-ctree_bin_true = dict()  # ctrees, binarized
-dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
-dtree_bin_true = dict()  # dtrees from the binarized ctrees ('chain' transform)
-for doc_id, ct_true in sorted(corpus_train.items()):
-    doc_name = doc_id.doc
-    # flavours of ctree
-    ct_true = REL_CONV(ct_true)  # map fine to coarse relations
-    ctree_true[doc_name] = ct_true
-    ct_bin_true = _binarize(ct_true)
-    ctree_bin_true[doc_name] = ct_bin_true
-    # flavours of dtree
-    dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc='tree')
-    dt_bin_true = RstDepTree.from_rst_tree(ct_true, nary_enc='chain')
-    # alt:
-    # dt_bin_true = RstDepTree.from_rst_tree(ct_bin_true, nary_enc='chain')
-    dtree_true[doc_name] = dt_true
-    dtree_bin_true[doc_name] = dt_bin_true
-# fit classifiers for nuclearity and rank (DIRTY)
-# NB: both are (dummily) fit on weakly ordered dtrees
-X_train = []
-y_nuc_train = []
-y_rnk_train = []
-for doc_name, dt in sorted(dtree_true.items()):
-    X_train.append(dt)
-    y_nuc_train.append(dt.nucs)
-    y_rnk_train.append(dt.ranks)
-# nuclearity clf
-nuc_clf = DummyNuclearityClassifier(strategy=NUC_STRATEGY)
-nuc_clf.fit(X_train, y_nuc_train)
-# rank clf
-rnk_clf = InsideOutAttachmentRanker(strategy=RNK_STRATEGY,
-                                    prioritize_same_unit=RNK_PRIORITY_SU,
-                                    order=RNK_ORDER)
-rnk_clf.fit(X_train, y_rnk_train)
+    #
+    args = parser.parse_args()
+    author_true = args.author_true
+    nary_enc_true = args.nary_enc_true
+    authors_pred = args.authors_pred
+    nary_enc_pred = args.nary_enc_pred
+    binarize_true = args.binarize_true
 
-# load test section of the RST corpus
-reader_test = RstReader(CD_TEST)
-corpus_test = reader_test.slurp()
-# gold RST trees
-ctree_true = dict()  # ctrees
-ctree_bin_true = dict()  # ctrees, binarized
-dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
-dtree_bin_true = dict()  # dtrees from the binarized ctrees ('chain' transform)
-for doc_id, ct_true in sorted(corpus_test.items()):
-    doc_name = doc_id.doc
-    # flavours of ctree
-    ct_true = REL_CONV(ct_true)  # map fine to coarse relations
-    ctree_true[doc_name] = ct_true
-    ct_bin_true = _binarize(ct_true)
-    ctree_bin_true[doc_name] = ct_bin_true
-    # flavours of dtree
-    dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc='tree')
-    dt_bin_true = RstDepTree.from_rst_tree(ct_true, nary_enc='chain')
-    # alt:
-    # dt_bin_true = RstDepTree.from_rst_tree(ct_bin_true, nary_enc='chain')
-    dtree_true[doc_name] = dt_true
-    dtree_bin_true[doc_name] = dt_bin_true
+    # 0. setup the postprocessors to flesh out unordered dtrees into ordered
+    # ones with nuclearity
+    nuc_clf, rnk_clf = setup_dtree_postprocessor(nary_enc_pred)
+
+    # the eval compares parses for the test section of the RST corpus
+    reader_test = RstReader(CD_TEST)
+    corpus_test = reader_test.slurp()
+
+    # reference
+    # current assumption: author_true is 'gold'
+    if author_true != 'gold':
+        raise NotImplementedError('Not yet')
+
+    ctree_true = dict()  # ctrees
+    dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
+    for doc_id, ct_true in sorted(corpus_test.items()):
+        doc_name = doc_id.doc
+        # original reference ctree, with coarse labels
+        ct_true = REL_CONV(ct_true)  # map fine to coarse relations
+        # corresponding dtree
+        dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc_true)
+        dtree_true[doc_name] = dt_true
+        # binarize ctree if necessary
+        if binarize_true:
+            ct_true = _binarize(ct_true)
+        ctree_true[doc_name] = ct_true
+
+    # predictions: [(parser_name, ([doc_names], [ct_pred], [dt_pred]))]
+    predictions = []
+    if 'joty' in authors_pred:
+        # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
+        predictions.append(
+            ('joty', eval_codra_output(ctree_true, dtree_true,
+                                       CODRA_OUT_DIR, EDUS_FILE,
+                                       rel_conv=REL_CONV,
+                                       nary_enc='chain',
+                                       nuc_clf=nuc_clf, rnk_clf=rnk_clf,
+                                       detailed=False))
+        )
+
+    if 'ours_chain' in authors_pred:
+        print('[chain] Eisner, predicted syntax')
+        # attelo out: unordered dtree ; we pass a nuclearity and rank classifiers
+        # to get an ordered dtree ;
+        # need to map to ctree
+        load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                         EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                         nuc_clf, rnk_clf,
+                                         detailed=False)
+        print('======================')
+
+    if 'ours_tree' in authors_pred:
+        print('[tree] Eisner, predicted syntax + same-unit')
+        load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                         EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
+                                         nuc_clf, rnk_clf,
+                                         detailed=False)
+        print('======================')
+
+    if False:  # FIXME repair (or forget) these
+        print('Eisner, predicted syntax + same-unit')
+        load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                         EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                                         nuc_clf, rnk_clf,
+                                         detailed=False)
+        print('======================')
+
+        print('Eisner, gold syntax')
+        load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                         EISNER_OUT_SYN_GOLD, EDUS_FILE,
+                                         nuc_clf, rnk_clf,
+                                         detailed=False)
+        print('======================')
+
+    # dependency eval
+
+    # report
+    # * table format
+    digits = 4
+    parser_names = ['joty']
+    width = max(len(x) for x in parser_names)
+
+    headers = ["UAS", "LAS", "LS"]
+    fmt = '%% %ds' % width  # first col: parser name
+    fmt += '  '
+    fmt += ' '.join(['% 9s' for _ in headers])
+    fmt += '\n'
+
+    headers = [""] + headers
+    report = fmt % tuple(headers)
+    report += '\n'
+    # end table format and header line
+
+    # * table content
+    for parser_name, (ctree_pred, dtree_pred) in predictions:
+        doc_names = sorted(dtree_true.keys())
+        dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
+        dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
+        score_uas, score_las, score_ls = compute_uas_las(dtree_true_list,
+                                                         dtree_pred_list)
+        # append to report
+        values = [parser_name]
+        for v in (score_uas, score_las, score_ls):
+            values += ["{0:0.{1}f}".format(v, digits)]
+        report += fmt % tuple(values)
+    # end table content
+    print(report)
+    # end report
+
+    # constituency eval
+    for parser_name, (ctree_pred, dtree_pred) in predictions:
+        doc_names = sorted(ctree_true.keys())
+        ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
+        ctree_pred_list = [ctree_pred[doc_name] for doc_name in doc_names]
+        # FIXME
+        # compute and print PARSEVAL scores
+        print(parseval_report(ctree_true_list, ctree_pred_list, digits=4))
+        # detailed report on S+N+R
+        if DETAILED:
+            print(parseval_detailed_report(ctree_true_list, ctree_pred_list,
+                                           metric_type='S+R'))
+        # end FIXME
 
 
-if True:
-    print('CODRA (Joty)')
-    eval_codra_output(ctree_true, dtree_true,
-                      CODRA_OUT_DIR, EDUS_FILE,
-                      rel_conv=REL_CONV,
-                      nary_enc='chain',
-                      nuc_clf=nuc_clf, rnk_clf=rnk_clf,
-                      detailed=False)
-    print('=======================')
-
-if True:
-    print('[chain] Eisner, predicted syntax')
-    load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                     EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                     nuc_clf, rnk_clf,
-                                     detailed=False)
-    print('======================')
-
-if True:
-    print('[tree] Eisner, predicted syntax + same-unit')
-    load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                     EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
-                                     nuc_clf, rnk_clf,
-                                     detailed=False)
-    print('======================')
-
-print('Eisner, predicted syntax + same-unit')
-load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                 EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
-                                 nuc_clf, rnk_clf,
-                                 detailed=False)
-print('======================')
-
-print('Eisner, gold syntax')
-load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                 EISNER_OUT_SYN_GOLD, EDUS_FILE,
-                                 nuc_clf, rnk_clf,
-                                 detailed=False)
-print('======================')
+if __name__ == '__main__':
+    main()

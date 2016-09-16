@@ -94,19 +94,7 @@ def eval_codra_output(ctree_true, dtree_true,
         dt_pred = RstDepTree.from_rst_tree(ct_pred, nary_enc='chain')
         dtree_pred[doc_name] = dt_pred
 
-    # compare pred and true
-    common_doc_names = set(dtree_true.keys()) & set(dtree_pred.keys())
-
-    # dep scores
-    dtree_true_list = [dt for doc_name, dt in sorted(dtree_true.items())
-                       if doc_name in common_doc_names]
-    dtree_pred_list = [dt for doc_name, dt in sorted(dtree_pred.items())
-                       if doc_name in common_doc_names]
-
-    score_uas, score_las, score_ls = compute_uas_las(dtree_true_list,
-                                                     dtree_pred_list)
-    print('UAS / LAS / LS : {:.4f} / {:.4f} / {:.4f}'.format(
-        score_uas, score_las, score_ls))
+    return ctree_pred, dtree_pred
 
     skipped_docs = set()
     # convert dicts to aligned lists of SimpleRSTTrees, skipping docs where
