@@ -81,11 +81,12 @@ DETAILED = False
 NUC_STRATEGY = 'unamb_else_most_frequent'
 RNK_STRATEGY = 'sdist-edist-rl'
 RNK_PRIORITY_SU = True
-RNK_ORDER = 'weak'
 
 
 def setup_dtree_postprocessor(nary_enc):
     """Setup the nuclearity and rank classifiers to flesh out dtrees."""
+    # tie the order with the encoding for n-ary nodes
+    order = 'weak' if nary_enc == 'tree' else 'strict'
     # load train section of the RST corpus, fit (currently dummy) classifiers
     # for nuclearity and rank
     reader_train = RstReader(CD_TRAIN)
@@ -117,7 +118,7 @@ def setup_dtree_postprocessor(nary_enc):
     # rank clf
     rnk_clf = InsideOutAttachmentRanker(strategy=RNK_STRATEGY,
                                         prioritize_same_unit=RNK_PRIORITY_SU,
-                                        order=RNK_ORDER)
+                                        order=order)
     rnk_clf.fit(X_train, y_rnk_train)
     return nuc_clf, rnk_clf
 
