@@ -20,8 +20,10 @@ from attelo.metrics.constituency import (parseval_detailed_report,
 from attelo.metrics.deptree import compute_uas_las
 
 # local to this package
-from evals.codra import eval_codra_output
-from evals.ours import load_deptrees_from_attelo_output
+from evals.codra import load_codra_ctrees, load_codra_dtrees
+from evals.ours import (load_deptrees_from_attelo_output,
+                        load_attelo_ctrees,
+                        load_attelo_dtrees)
 
 
 # RST corpus
@@ -186,37 +188,45 @@ def main():
             ct_true = _binarize(ct_true)
         ctree_true[doc_name] = ct_true
 
-    # predictions: [(parser_name, ([doc_names], [ct_pred], [dt_pred]))]
-    predictions = []
+    
+    c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
+    d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
     if 'joty' in authors_pred:
         # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
-        predictions.append(
-            ('joty', eval_codra_output(ctree_true, dtree_true,
-                                       CODRA_OUT_DIR, EDUS_FILE,
-                                       rel_conv=REL_CONV,
-                                       nary_enc='chain',
-                                       nuc_clf=nuc_clf, rnk_clf=rnk_clf,
-                                       detailed=False))
+        c_preds.append(
+            ('joty', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
         )
+        d_preds.append(
+            ('joty', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
+                                       nary_enc='chain'))
+        )
+        # joty-{chain,tree} would be the same except nary_enc='tree' ;
+        # the nary_enc does not matter because codra outputs binary ctrees,
+        # hence both encodings result in (the same) strictly ordered dtrees
 
     if 'ours_chain' in authors_pred:
-        print('[chain] Eisner, predicted syntax')
-        # attelo out: unordered dtree ; we pass a nuclearity and rank classifiers
-        # to get an ordered dtree ;
-        # need to map to ctree
-        load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                         EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                         nuc_clf, rnk_clf,
-                                         detailed=False)
-        print('======================')
+        # Eisner, predicted syntax, chain
+        c_preds.append(
+            ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                              nuc_clf, rnk_clf))
+        )
+        d_preds.append(
+            ('ours-chain', load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                              nuc_clf, rnk_clf))
+        )
 
     if 'ours_tree' in authors_pred:
-        print('[tree] Eisner, predicted syntax + same-unit')
-        load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                         EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
-                                         nuc_clf, rnk_clf,
-                                         detailed=False)
-        print('======================')
+        # Eisner, predicted syntax, tree + same-unit
+        c_preds.append(
+            ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                             EDUS_FILE,
+                                             nuc_clf, rnk_clf))
+        )
+        d_preds.append(
+            ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                             EDUS_FILE,
+                                             nuc_clf, rnk_clf))
+        )
 
     if False:  # FIXME repair (or forget) these
         print('Eisner, predicted syntax + same-unit')
@@ -238,8 +248,7 @@ def main():
     # report
     # * table format
     digits = 4
-    parser_names = ['joty']
-    width = max(len(x) for x in parser_names)
+    width = max(len(parser_name) for parser_name, _ in d_preds)
 
     headers = ["UAS", "LAS", "LS"]
     fmt = '%% %ds' % width  # first col: parser name
@@ -253,14 +262,14 @@ def main():
     # end table format and header line
 
     # * table content
-    for parser_name, (ctree_pred, dtree_pred) in predictions:
+    for parser_name, dtree_pred in d_preds:
         doc_names = sorted(dtree_true.keys())
         dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
         dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
         score_uas, score_las, score_ls = compute_uas_las(dtree_true_list,
                                                          dtree_pred_list)
         # append to report
-        values = [parser_name]
+        values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
         for v in (score_uas, score_las, score_ls):
             values += ["{0:0.{1}f}".format(v, digits)]
         report += fmt % tuple(values)
@@ -269,12 +278,13 @@ def main():
     # end report
 
     # constituency eval
-    for parser_name, (ctree_pred, dtree_pred) in predictions:
+    for parser_name, ctree_pred in c_preds:
         doc_names = sorted(ctree_true.keys())
         ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
         ctree_pred_list = [ctree_pred[doc_name] for doc_name in doc_names]
         # FIXME
         # compute and print PARSEVAL scores
+        print(parser_name)
         print(parseval_report(ctree_true_list, ctree_pred_list, digits=4))
         # detailed report on S+N+R
         if DETAILED:
