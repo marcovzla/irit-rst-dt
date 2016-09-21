@@ -103,7 +103,8 @@ validation on the training data)
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-mst'
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-eisner'
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt_su-eisner'
-TEST_EVALUATION_KEY = 'maxent-iheads-global-AD.L-jnt_su-eisner'
+TEST_EVALUATION_KEY = 'maxent-iheads-global-AD.L-jnt-eisner'
+# TEST_EVALUATION_KEY = 'maxent-iheads-global-AD.L-jnt_su-eisner'
 """Evaluation to use for testing.
 
 Leave this to None until you think it's OK to look at the test data.

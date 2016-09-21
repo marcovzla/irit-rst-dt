@@ -16,7 +16,8 @@ from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 
 
-def attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir):
+def attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir,
+                                       nary_enc_pred='tree'):
     """Generate disdep files from a file dump of attelo predictions.
 
     Parameters
@@ -28,12 +29,19 @@ def attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir):
         triples).
     out_dir: str
         Path to the output folder.
+    nary_enc_pred: one of {'chain', 'tree'}
+        Encoding for n-ary cnodes in the predicted dtree ; here it
+        currently triggers the strictness of the order assumed by the
+        dtree postprocessor: nary_enc_pred='chain' implies order='strict',
+        nary_enc_pred='tree' implies order='weak'.
     """
+    order = 'weak' if nary_enc_pred == 'tree' else 'strict'
     # set up heuristic classifiers for nuclearity and rank
     nuc_clf = DummyNuclearityClassifier(strategy='unamb_else_most_frequent')
     nuc_clf.fit([], [])  # dummy fit
-    rnk_clf = InsideOutAttachmentRanker(strategy='closest-intra-rl-inter-rl',
-                                        prioritize_same_unit=True)
+    rnk_clf = InsideOutAttachmentRanker(strategy='sdist-edist-rl',
+                                        prioritize_same_unit=True,
+                                        order=order)
     rnk_clf.fit([], [])  # dummy fit
 
     # load EDUs
@@ -84,17 +92,23 @@ def attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir):
 
 
 if __name__ == '__main__':
+    nary_enc_pred = 'tree'
     edus_file_glob = os.path.join('TMP', 'latest', 'data', 'TEST',
                                   '*.edu-pairs.sparse.edu_input')
-    edges_file_glob = os.path.join('TMP', 'latest', 'scratch-current',
-                                   'combined', 'output.*')
+    edges_file_glob = os.path.join(
+        'TMP', 'latest', 'scratch-current',
+        'combined',
+        # 'output.*'
+        'output.maxent-iheads-global-AD.L-jnt-eisner'
+    )
     # attelo predictions are currently stored in one big file
     edges_files = glob(edges_file_glob)
     assert len(edges_files) == 1
     edges_file = edges_files[0]
     # paths to the resulting disdep files
-    out_dir = os.path.join('TMP_disdep', 'chain', 'ours', 'test')
+    out_dir = os.path.join('TMP_disdep', nary_enc_pred, 'ours', 'test')
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     # do the conversion
-    attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir)
+    attelo_predictions_to_disdep_files(edus_file_glob, edges_file, out_dir,
+                                       nary_enc_pred=nary_enc_pred)

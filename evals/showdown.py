@@ -53,6 +53,12 @@ EISNER_OUT_SYN_PRED = os.path.join(
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 # 2016-09-14 "tree" transform, predicted syntax
+EISNER_OUT_TREE_SYN_PRED = os.path.join(
+    '/home/mmorey/melodi',
+    'irit-rst-dt/TMP/latest',  # lbl
+    'scratch-current/combined',
+    'output.maxent-iheads-global-AD.L-jnt-eisner')
+
 EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
     '/home/mmorey/melodi',
     'irit-rst-dt/TMP/latest',  # lbl
@@ -77,6 +83,8 @@ CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 
 # level of detail for parseval
 DETAILED = False
+SPAN_SEL = None  # None, 'leaves', 'non-leaves'
+STRINGENT = False
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
 RNK_STRATEGY = 'sdist-edist-rl'
@@ -135,7 +143,7 @@ def main():
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'ji',
-                                 'ours_chain', 'ours_tree'],
+                                 'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
                         choices=['tree', 'chain'],
@@ -161,6 +169,9 @@ def main():
     authors_pred = args.authors_pred
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
+    if binarize_true and nary_enc_true != 'chain':
+        raise ValueError("--binarize_true is compatible with "
+                         "--nary_enc_true chain only")
 
     # 0. setup the postprocessors to flesh out unordered dtrees into ordered
     # ones with nuclearity
@@ -181,13 +192,13 @@ def main():
         doc_name = doc_id.doc
         # original reference ctree, with coarse labels
         ct_true = REL_CONV(ct_true)  # map fine to coarse relations
+        if binarize_true:
+            # binarize ctree if required
+            ct_true = _binarize(ct_true)
+        ctree_true[doc_name] = ct_true
         # corresponding dtree
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc_true)
         dtree_true[doc_name] = dt_true
-        # binarize ctree if necessary
-        if binarize_true:
-            ct_true = _binarize(ct_true)
-        ctree_true[doc_name] = ct_true
 
     
     c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
@@ -219,14 +230,26 @@ def main():
     if 'ours_tree' in authors_pred:
         # Eisner, predicted syntax, tree + same-unit
         c_preds.append(
-            ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
+            ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED,
                                              EDUS_FILE,
                                              nuc_clf, rnk_clf))
         )
         d_preds.append(
-            ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
+            ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
                                              EDUS_FILE,
                                              nuc_clf, rnk_clf))
+        )
+    if 'ours_tree_su' in authors_pred:
+        # Eisner, predicted syntax, tree + same-unit
+        c_preds.append(
+            ('ours-tree-su', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                                EDUS_FILE,
+                                                nuc_clf, rnk_clf))
+        )
+        d_preds.append(
+            ('ours-tree-su', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                                EDUS_FILE,
+                                                nuc_clf, rnk_clf))
         )
 
     if False:  # FIXME repair (or forget) these
@@ -286,11 +309,14 @@ def main():
         # FIXME
         # compute and print PARSEVAL scores
         print(parser_name)
-        print(parseval_report(ctree_true_list, ctree_pred_list, digits=4))
+        print(parseval_report(ctree_true_list, ctree_pred_list, digits=4,
+                              span_sel=SPAN_SEL,
+                              stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:
             print(parseval_detailed_report(ctree_true_list, ctree_pred_list,
-                                           metric_type='S+R'))
+                                           metric_type='S+R',
+                                           span_sel=SPAN_SEL))
         # end FIXME
 
 

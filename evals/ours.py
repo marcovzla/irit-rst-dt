@@ -16,9 +16,6 @@ from educe.rst_dt.deptree import RstDepTree, RstDtException
 from educe.rst_dt.document_plus import align_edus_with_paragraphs
 #
 from attelo.io import load_edus
-from attelo.metrics.constituency import (parseval_detailed_report,
-                                         parseval_report)
-from attelo.metrics.deptree import compute_uas_las
 from attelo.table import UNRELATED  # for load_attelo_output_file
 
 
@@ -160,7 +157,6 @@ def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf):
             ctree_pred[doc_name] = rtree_pred
         except RstDtException as rst_e:
             print(rst_e)
-            skipped_docs.add(doc_name)
             if False:
                 print('\n'.join('{}: {}'.format(edu.text_span(), edu)
                                 for edu in educe_edus[doc_name]))
@@ -171,9 +167,7 @@ def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf):
 
 def load_deptrees_from_attelo_output(ctree_true, dtree_true,
                                      output_file, edus_file,
-                                     nuc_clf, rnk_clf,
-                                     detailed=False,
-                                     skpd_docs=None):
+                                     nuc_clf, rnk_clf):
     """Load an RstDepTree from the output of attelo.
 
     Parameters
