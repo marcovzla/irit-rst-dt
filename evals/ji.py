@@ -114,6 +114,14 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
         # convert relation labels
         if rel_conv is not None:
             ct_pred = rel_conv(ct_pred)
+            # change "same_unit" (in Ji's output) into "same-unit" (in ours)
+            for pos in ct_pred.treepositions():
+                t = ct_pred[pos]
+                if isinstance(t, RSTTree):
+                    node = t.label()
+                    # replace "same_unit" with "same-unit"
+                    if node.rel == 'same_unit':
+                        node.rel = 'same-unit'
         # store the resulting RSTTree
         ctree_pred[doc_name] = ct_pred
 

@@ -19,7 +19,7 @@ from educe.rst_dt.feng import load_feng_output_files
 from educe.rst_dt.rst_wsj_corpus import (DOUBLE_FOLDER, TEST_FOLDER,
                                          TRAIN_FOLDER)
 
-from .ji import load_ji_dtrees
+from evals.ji import load_ji_dtrees
 
 
 # original RST corpus

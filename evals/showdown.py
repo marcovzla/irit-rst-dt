@@ -21,6 +21,7 @@ from attelo.metrics.deptree import compute_uas_las
 
 # local to this package
 from evals.codra import load_codra_ctrees, load_codra_dtrees
+from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
                         load_attelo_dtrees)
@@ -79,7 +80,10 @@ EISNER_OUT_SYN_GOLD = os.path.join(
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
+# output of Joty's parser CODRA
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
+# output of Ji's parser DPLP
+JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
 
 # level of detail for parseval
 DETAILED = False
@@ -213,6 +217,20 @@ def main():
                                        nary_enc='chain'))
         )
         # joty-{chain,tree} would be the same except nary_enc='tree' ;
+        # the nary_enc does not matter because codra outputs binary ctrees,
+        # hence both encodings result in (the same) strictly ordered dtrees
+
+    if 'ji' in authors_pred:
+        # DPLP outputs RST ctrees in the form of lists of spans;
+        # load_ji_dtrees maps them to RST dtrees
+        c_preds.append(
+            ('ji', load_ji_ctrees(JI_OUT_DIR, REL_CONV))
+        )
+        d_preds.append(
+            ('ji', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
+                                  nary_enc='chain'))
+        )
+        # ji-{chain,tree} would be the same except nary_enc='tree' ;
         # the nary_enc does not matter because codra outputs binary ctrees,
         # hence both encodings result in (the same) strictly ordered dtrees
 
