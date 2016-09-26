@@ -88,6 +88,9 @@ JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/
 # level of detail for parseval
 DETAILED = False
 SPAN_SEL = None  # None, 'leaves', 'non-leaves'
+# "PER_DOC = True" computes p, r, f as in DPLP: compute scores per doc,
+# then average over docs
+PER_DOC = False  # should be False, except for comparison with the DPLP paper
 STRINGENT = False
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
@@ -329,6 +332,7 @@ def main():
         print(parser_name)
         print(parseval_report(ctree_true_list, ctree_pred_list, digits=4,
                               span_sel=SPAN_SEL,
+                              per_doc=PER_DOC,
                               stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:
