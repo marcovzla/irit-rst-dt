@@ -21,6 +21,7 @@ from attelo.metrics.deptree import compute_uas_las
 
 # local to this package
 from evals.codra import load_codra_ctrees, load_codra_dtrees
+from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
@@ -84,6 +85,8 @@ EISNER_OUT_SYN_GOLD = os.path.join(
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 # output of Ji's parser DPLP
 JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
+# Feng's parser
+FENG_OUT_DIR = '/home/mmorey/melodi/rst/feng_hirst/tmp'
 
 # level of detail for parseval
 DETAILED = False
@@ -210,6 +213,16 @@ def main():
     
     c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
     d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
+
+    if 'feng' in authors_pred:
+        c_preds.append(
+            ('feng', load_feng_ctrees(FENG_OUT_DIR, REL_CONV))
+        )
+        d_preds.append(
+            ('feng', load_feng_dtrees(FENG_OUT_DIR, REL_CONV,
+                                      nary_enc='chain'))
+        )
+
     if 'joty' in authors_pred:
         # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
         c_preds.append(
