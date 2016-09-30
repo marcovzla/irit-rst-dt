@@ -8,7 +8,7 @@ from __future__ import print_function
 import argparse
 import os
 
-from educe.rst_dt.annotation import _binarize
+from educe.rst_dt.annotation import _binarize, SimpleRSTTree
 from educe.rst_dt.corpus import (RstRelationConverter,
                                  Reader as RstReader)
 from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
@@ -17,7 +17,7 @@ from educe.rst_dt.deptree import RstDepTree
 #
 from attelo.metrics.constituency import (parseval_detailed_report,
                                          parseval_report)
-from attelo.metrics.deptree import compute_uas_las
+from attelo.metrics.deptree import compute_uas_las, compute_uas_las_undirected
 
 # local to this package
 from evals.codra import load_codra_ctrees, load_codra_dtrees
@@ -90,7 +90,7 @@ FENG_OUT_DIR = '/home/mmorey/melodi/rst/feng_hirst/tmp'
 
 # level of detail for parseval
 DETAILED = False
-SPAN_SEL = None  # None, 'leaves', 'non-leaves'
+SPAN_SEL = 'non-leaves'  # None, 'leaves', 'non-leaves'
 # "PER_DOC = True" computes p, r, f as in DPLP: compute scores per doc,
 # then average over docs
 PER_DOC = False  # should be False, except for comparison with the DPLP paper
@@ -171,7 +171,8 @@ def main():
     # * ctree eval
     parser.add_argument('--binarize_true', action='store_true',
                         help="Binarize the reference ctree for the eval")
-
+    parser.add_argument('--simple_rsttree', action='store_true',
+                        help="Binarize ctree and move relations up")
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -179,6 +180,7 @@ def main():
     authors_pred = args.authors_pred
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
+    simple_rsttree = args.simple_rsttree
     if binarize_true and nary_enc_true != 'chain':
         raise ValueError("--binarize_true is compatible with "
                          "--nary_enc_true chain only")
@@ -308,7 +310,7 @@ def main():
     digits = 4
     width = max(len(parser_name) for parser_name, _ in d_preds)
 
-    headers = ["UAS", "LAS", "LS"]
+    headers = ["UAS", "LAS", "LS", "UUAS", "ULAS"]
     fmt = '%% %ds' % width  # first col: parser name
     fmt += '  '
     fmt += ' '.join(['% 9s' for _ in headers])
@@ -324,11 +326,28 @@ def main():
         doc_names = sorted(dtree_true.keys())
         dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
         dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
+        # WIP print per doc eval
+        for doc_name, dt_true, dt_pred in zip(
+                doc_names, dtree_true_list, dtree_pred_list):
+            with open(parser_name + '/' + doc_name + '.d_eval', mode='w') as f:
+                print(', '.join('{:.4f}'.format(x)
+                                for x in compute_uas_las(
+                                        [dt_true], [dt_pred])),
+                      file=f)
+                # WIP scores for undirected edges
+                print(', '.join('{:.4f}'.format(x)
+                                for x in compute_uas_las_undirected(
+                                        [dt_true], [dt_pred])),
+                      file=f)
+
+        # end WIP print
         score_uas, score_las, score_ls = compute_uas_las(dtree_true_list,
                                                          dtree_pred_list)
+        score_uuas, score_ulas = compute_uas_las_undirected(dtree_true_list,
+                                                            dtree_pred_list)
         # append to report
         values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
-        for v in (score_uas, score_las, score_ls):
+        for v in (score_uas, score_las, score_ls, score_uuas, score_ulas):
             values += ["{0:0.{1}f}".format(v, digits)]
         report += fmt % tuple(values)
     # end table content
@@ -340,6 +359,32 @@ def main():
         doc_names = sorted(ctree_true.keys())
         ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
         ctree_pred_list = [ctree_pred[doc_name] for doc_name in doc_names]
+        if simple_rsttree:
+            ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
+                               for x in ctree_true_list]
+            ctree_pred_list = [SimpleRSTTree.from_rst_tree(x)
+                               for x in ctree_pred_list]
+        # WIP print SimpleRSTTrees
+        if not os.path.exists('gold'):
+            os.makedirs('gold')
+        for doc_name, ct in zip(doc_names, ctree_true_list):
+            with open('gold/' + ct.origin.doc, mode='w') as f:
+                print(ct, file=f)
+        if not os.path.exists(parser_name):
+            os.makedirs(parser_name)
+        for doc_name, ct in zip(doc_names, ctree_pred_list):
+            with open(parser_name + '/' + doc_name, mode='w') as f:
+                print(ct, file=f)
+        # WIP eval each tree in turn
+        for doc_name, ct_true, ct_pred in zip(
+                doc_names, ctree_true_list, ctree_pred_list):
+            with open(parser_name + '/' + doc_name + '.c_eval', mode='w') as f:
+                print(parseval_report([ct_true], [ct_pred], digits=4,
+                                      span_sel=SPAN_SEL,
+                                      per_doc=PER_DOC,
+                                      stringent=STRINGENT),
+                      file=f)
+        # end WIP
         # FIXME
         # compute and print PARSEVAL scores
         print(parser_name)
