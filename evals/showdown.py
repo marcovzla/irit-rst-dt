@@ -57,13 +57,13 @@ EISNER_OUT_SYN_PRED = os.path.join(
 # 2016-09-14 "tree" transform, predicted syntax
 EISNER_OUT_TREE_SYN_PRED = os.path.join(
     '/home/mmorey/melodi',
-    'irit-rst-dt/TMP/latest',  # lbl
+    'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
     '/home/mmorey/melodi',
-    'irit-rst-dt/TMP/latest',  # lbl
+    'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt_su-eisner')
 # end 2016-09-14
@@ -327,6 +327,8 @@ def main():
         dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
         dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
         # WIP print per doc eval
+        if not os.path.exists(parser_name):
+            os.makedirs(parser_name)
         for doc_name, dt_true, dt_pred in zip(
                 doc_names, dtree_true_list, dtree_pred_list):
             with open(parser_name + '/' + doc_name + '.d_eval', mode='w') as f:
