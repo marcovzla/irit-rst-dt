@@ -41,7 +41,7 @@ if __name__ == '__main__':
     print('\t'.join(['parser',
                      'a', 'l', 'n', 'r',
                      'al', 'an', 'ar',
-                     'aln',
+                     'aln', 'alr',
                      'alnr',
                      'support']))
 
@@ -60,6 +60,7 @@ if __name__ == '__main__':
         cnt_an = 0  # correct attachment + nuc
         cnt_ar = 0  # correct attachment + rank
         cnt_aln = 0  # correct attachment + label + nuc
+        cnt_alr = 0  # correct attachment + label + rank
         cnt_alnr = 0  # correct attachment + label + nuc + rank
 
         for doc_name, f_true in files_true.items():
@@ -93,12 +94,14 @@ if __name__ == '__main__':
                             cnt_ar += 1
                         if ok_a and ok_l and ok_n:
                             cnt_aln += 1
+                        if ok_a and ok_l and ok_r:
+                            cnt_alr += 1
                         if ok_a and ok_l and ok_n and ok_r:
                             cnt_alnr += 1
         print('\t'.join([author_pred]
                         + ['{:.4f}'.format(float(cnt_x) / cnt_tot)
                            for cnt_x in [cnt_a, cnt_l, cnt_n, cnt_r,
                                          cnt_al, cnt_an, cnt_ar,
-                                         cnt_aln,
+                                         cnt_aln, cnt_alr,
                                          cnt_alnr]]
                         + [str(cnt_tot)]))
