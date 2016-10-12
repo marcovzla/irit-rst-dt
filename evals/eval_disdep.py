@@ -17,12 +17,12 @@ if __name__ == '__main__':
         description="Evaluate dis_dep trees against a given reference")
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
-                                 'joty', 'feng', 'ji',
+                                 'joty', 'feng', 'feng2', 'ji',
                                  'ours'],
                         help="Author(s) of the predictions")
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
-                                 'joty', 'feng', 'ji',
+                                 'joty', 'feng', 'feng2', 'ji',
                                  'ours'],
                         help="Author of the reference")
     parser.add_argument('--nary_enc', default='chain',

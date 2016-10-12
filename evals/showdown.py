@@ -94,10 +94,6 @@ FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_
 
 # level of detail for parseval
 DETAILED = False
-SPAN_SEL = None  # None, 'leaves', 'non-leaves'
-# "PER_DOC = True" computes p, r, f as in DPLP: compute scores per doc,
-# then average over docs
-PER_DOC = False  # should be False, except for comparison with the DPLP paper
 STRINGENT = False
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
@@ -177,6 +173,11 @@ def main():
                         help="Binarize the reference ctree for the eval")
     parser.add_argument('--simple_rsttree', action='store_true',
                         help="Binarize ctree and move relations up")
+    parser.add_argument('--span_sel', default='none',
+                        choices=['none', 'leaves', 'non-leaves'],
+                        help="Binarize ctree and move relations up")
+    parser.add_argument('--per_doc', action='store_true',
+                        help="Doc-averaged scores (cf. Ji's eval)")
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -185,6 +186,18 @@ def main():
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
     simple_rsttree = args.simple_rsttree
+    span_sel = args.span_sel
+    if span_sel == 'none':
+        span_sel = None
+    if simple_rsttree:
+        # the point of evaluating on simple rst trees is to get leaves
+        # out of the way
+        span_sel = 'non-leaves'
+    # "per_doc = True" computes p, r, f as in DPLP: compute scores per doc
+    # then average over docs
+    # it should be False, except for comparison with the DPLP paper
+    per_doc = args.per_doc
+    #
     if binarize_true and nary_enc_true != 'chain':
         raise ValueError("--binarize_true is compatible with "
                          "--nary_enc_true chain only")
@@ -399,8 +412,8 @@ def main():
             with codecs.open(parser_name + '/' + doc_name + '.c_eval',
                              mode='w', encoding='utf-8') as f:
                 print(parseval_report([ct_true], [ct_pred], digits=4,
-                                      span_sel=SPAN_SEL,
-                                      per_doc=PER_DOC,
+                                      span_sel=span_sel,
+                                      per_doc=per_doc,
                                       stringent=STRINGENT),
                       file=f)
         # end WIP
@@ -408,14 +421,14 @@ def main():
         # compute and print PARSEVAL scores
         print(parser_name)
         print(parseval_report(ctree_true_list, ctree_pred_list, digits=4,
-                              span_sel=SPAN_SEL,
-                              per_doc=PER_DOC,
+                              span_sel=span_sel,
+                              per_doc=per_doc,
                               stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:
             print(parseval_detailed_report(ctree_true_list, ctree_pred_list,
                                            metric_type='S+R',
-                                           span_sel=SPAN_SEL))
+                                           span_sel=span_sel))
         # end FIXME
 
 

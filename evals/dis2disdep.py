@@ -19,6 +19,7 @@ from educe.rst_dt.feng import load_feng_output_files
 from educe.rst_dt.rst_wsj_corpus import (DOUBLE_FOLDER, TEST_FOLDER,
                                          TRAIN_FOLDER)
 
+from evals.gcrf_tree_format import load_gcrf_dtrees
 from evals.ji import load_ji_dtrees
 
 
@@ -37,7 +38,9 @@ REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
 # output of Joty's parser
 OUT_JOTY = os.path.join('/home/mmorey/melodi/rst/joty/Doc-level/')
 # output of Feng & Hirst's parser
-OUT_FENG = os.path.join('/home/mmorey/melodi/rst/feng_hirst/tmp/')
+OUT_FENG = os.path.join('/home/mmorey/melodi/rst/feng_hirst/phil/tmp/')
+# output of Feng & Hirst's parser
+OUT_FENG2 = os.path.join('/home/mmorey/melodi/rst/feng_hirst/gCRF_dist/texts/results/test_batch_gold_seg')
 # output of Ji's parser
 OUT_JI = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
 
@@ -51,7 +54,8 @@ def main():
                         choices=['chain', 'tree'],
                         help="Encoding for n-ary nodes")
     parser.add_argument('--author', default='gold',
-                        choices=['gold', 'silver', 'joty', 'feng', 'ji'],
+                        choices=['gold', 'silver',
+                                 'joty', 'feng', 'feng2', 'ji'],
                         help="Author of the version of the corpus")
     parser.add_argument('--split', default='test',
                         choices=['train', 'test', 'double'],
@@ -109,6 +113,14 @@ def main():
                   for doc_name, rtree in zip(doc_names, rtrees)}
         # set reference to the document in the RstDepTree (required by
         # dump_disdep_files)
+        for doc_name, dtree in dtrees.items():
+            dtree.origin = FileId(doc_name, None, None, None)
+
+    elif author == 'feng2':
+        if corpus_split != 'test':
+            raise ValueError("The output of Feng & Hirst's parser is "
+                             "available for the 'test' split only")
+        dtrees = load_gcrf_dtrees(OUT_FENG2, REL_CONV)
         for doc_name, dtree in dtrees.items():
             dtree.origin = FileId(doc_name, None, None, None)
 
