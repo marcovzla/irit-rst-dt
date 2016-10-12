@@ -6,6 +6,7 @@ Included are dependency and constituency tree metrics.
 from __future__ import print_function
 
 import argparse
+import codecs
 import os
 
 from educe.rst_dt.annotation import _binarize, SimpleRSTTree
@@ -22,6 +23,7 @@ from attelo.metrics.deptree import compute_uas_las, compute_uas_las_undirected
 # local to this package
 from evals.codra import load_codra_ctrees, load_codra_dtrees
 from evals.feng import load_feng_ctrees, load_feng_dtrees
+from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
 from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
@@ -85,12 +87,14 @@ EISNER_OUT_SYN_GOLD = os.path.join(
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 # output of Ji's parser DPLP
 JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
-# Feng's parser
-FENG_OUT_DIR = '/home/mmorey/melodi/rst/feng_hirst/tmp'
+# Feng's parsers
+FENG_DIR = '/home/mmorey/melodi/rst/feng_hirst/'
+FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
+FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_seg')
 
 # level of detail for parseval
 DETAILED = False
-SPAN_SEL = 'non-leaves'  # None, 'leaves', 'non-leaves'
+SPAN_SEL = None  # None, 'leaves', 'non-leaves'
 # "PER_DOC = True" computes p, r, f as in DPLP: compute scores per doc,
 # then average over docs
 PER_DOC = False  # should be False, except for comparison with the DPLP paper
@@ -152,7 +156,7 @@ def main():
     # predictions
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
-                                 'joty', 'feng', 'ji',
+                                 'joty', 'feng', 'feng2', 'ji',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -161,7 +165,7 @@ def main():
     # reference
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
-                                 'joty', 'feng', 'ji',
+                                 'joty', 'feng', 'feng2', 'ji',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -218,10 +222,19 @@ def main():
 
     if 'feng' in authors_pred:
         c_preds.append(
-            ('feng', load_feng_ctrees(FENG_OUT_DIR, REL_CONV))
+            ('feng', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
         )
         d_preds.append(
-            ('feng', load_feng_dtrees(FENG_OUT_DIR, REL_CONV,
+            ('feng', load_feng_dtrees(FENG1_OUT_DIR, REL_CONV,
+                                      nary_enc='chain'))
+        )
+
+    if 'feng2' in authors_pred:
+        c_preds.append(
+            ('gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
+        )
+        d_preds.append(
+            ('gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
                                       nary_enc='chain'))
         )
 
@@ -331,7 +344,8 @@ def main():
             os.makedirs(parser_name)
         for doc_name, dt_true, dt_pred in zip(
                 doc_names, dtree_true_list, dtree_pred_list):
-            with open(parser_name + '/' + doc_name + '.d_eval', mode='w') as f:
+            with codecs.open(parser_name + '/' + doc_name + '.d_eval',
+                             mode='w', encoding='utf-8') as f:
                 print(', '.join('{:.4f}'.format(x)
                                 for x in compute_uas_las(
                                         [dt_true], [dt_pred])),
@@ -370,17 +384,20 @@ def main():
         if not os.path.exists('gold'):
             os.makedirs('gold')
         for doc_name, ct in zip(doc_names, ctree_true_list):
-            with open('gold/' + ct.origin.doc, mode='w') as f:
+            with codecs.open('gold/' + ct.origin.doc, mode='w',
+                             encoding='utf-8') as f:
                 print(ct, file=f)
         if not os.path.exists(parser_name):
             os.makedirs(parser_name)
         for doc_name, ct in zip(doc_names, ctree_pred_list):
-            with open(parser_name + '/' + doc_name, mode='w') as f:
+            with codecs.open(parser_name + '/' + doc_name, mode='w',
+                             encoding='utf-8') as f:
                 print(ct, file=f)
         # WIP eval each tree in turn
         for doc_name, ct_true, ct_pred in zip(
                 doc_names, ctree_true_list, ctree_pred_list):
-            with open(parser_name + '/' + doc_name + '.c_eval', mode='w') as f:
+            with codecs.open(parser_name + '/' + doc_name + '.c_eval',
+                             mode='w', encoding='utf-8') as f:
                 print(parseval_report([ct_true], [ct_pred], digits=4,
                                       span_sel=SPAN_SEL,
                                       per_doc=PER_DOC,
