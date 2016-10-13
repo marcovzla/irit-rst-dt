@@ -4,34 +4,33 @@ Created on 2014-01-17
 @author: Vanessa Wei Feng
 '''
 
+import os.path
+import sys
+import time
+import traceback
+from datetime import datetime
+from optparse import OptionParser
+
+import paths
+import utils.serialize
+from document.doc import Document
+from logs.log_writer import LogWriter
+from prep.preprocesser import Preprocesser
 from segmenters.crf_segmenter import CRFSegmenter
 from segmenters.gold_segmenter import GoldSegmenter  # MM
 from treebuilder.build_tree_CRF import CRFTreeBuilder
 
-from optparse import OptionParser
-
-import paths
-import os.path
-import sys
-from document.doc import Document
-import time
-import traceback
-from datetime import datetime
-
-from logs.log_writer import LogWriter
-from prep.preprocesser import Preprocesser
-
-import utils.serialize
 
 class DiscourseParser():
-    def __init__(self, options, output_dir = None, 
-                 log_writer = None):
+    def __init__(self, options, output_dir=None, log_writer=None):
         self.verbose = options.verbose
         self.skip_parsing = options.skip_parsing
         self.global_features = options.global_features
         self.save_preprocessed_doc = options.save_preprocessed_doc
         
-        self.output_dir = os.path.join(paths.OUTPUT_PATH, output_dir if output_dir is not None else '')
+        self.output_dir = os.path.join(
+            paths.OUTPUT_PATH,
+            output_dir if output_dir is not None else '')
         if not os.path.exists(self.output_dir):
             print 'Output directory %s not exists, creating it now.' % self.output_dir
             os.makedirs(self.output_dir)
@@ -50,35 +49,37 @@ class DiscourseParser():
             print traceback.print_exc()
 
             raise e
-        # MM replace CRF segmenter with a fake one that loads segmentation
-        # from a file
-        load_prepared_seg = True
-        if load_prepared_seg:
-            self.segmenter = GoldSegmenter('../texts/results/test_batch_gold_seg')
+
+        # MM enable to load segmentation from .edus files
+        self.load_edus = options.load_edus
+        if self.load_edus:
+            # fake EDU segmenter that loads segmentation from files in a
+            # folder
+            self.segmenter = GoldSegmenter(self.load_edus)
         else:
             try:
-                self.segmenter = CRFSegmenter(_name = self.feature_sets, verbose = self.verbose, global_features = self.global_features)
+                self.segmenter = CRFSegmenter(
+                    _name=self.feature_sets, verbose=self.verbose,
+                    global_features=self.global_features)
             except Exception, e:
                 print "*** Loading Segmentation module failed..."
                 print traceback.print_exc()
-
                 raise e
-        
+
         try:        
             if not self.skip_parsing:
-                self.treebuilder = CRFTreeBuilder(_name = self.feature_sets, verbose = self.verbose) 
+                self.treebuilder = CRFTreeBuilder(
+                    _name=self.feature_sets, verbose=self.verbose) 
             else:
                 self.treebuilder = None
         except Exception, e:
             print "*** Loading Tree-building module failed..."
             print traceback.print_exc()
             raise e
-        
-        
+
         initEnd = time.time()
         print 'Finished initialization in %.2f seconds.' % (initEnd - initStart)
         print       
-    
         
     def unload(self):
         if self.preprocesser is not None:
@@ -89,8 +90,7 @@ class DiscourseParser():
         
         if not self.treebuilder is None:
             self.treebuilder.unload()
-        
-    
+
     def parse(self, filename):
         if not os.path.exists(filename):
             print '%s does not exist.' % filename
@@ -125,15 +125,17 @@ class DiscourseParser():
             print
         except Exception, e:
             print "*** Preprocessing failed ***"
-            print traceback.print_exc()
-               
+            print traceback.print_exc()               
             raise e
         
         try:
             if not doc.segmented:
                 segStart = time.time()
-                
-                self.segmenter.segment(doc, filename)  # MM added filename for GoldSegmenter
+                if self.load_edus:
+                    # MM GoldSegmenter needs a filename
+                    self.segmenter.segment(doc, filename)
+                else:
+                    self.segmenter.segment(doc)
                 
                 if self.verbose:
                     print 'edus'
@@ -149,8 +151,7 @@ class DiscourseParser():
                 segEnd = time.time()
                 print 'Finished segmentation in %.2f seconds.' % (segEnd - segStart)     
                 print 'Segmented into %d EDUs.' % len(doc.edus)
-                
-                
+
                 self.log_writer.write('Finished segmentation in %.2f seconds. Segmented into %d EDUs.' % ((segEnd - segStart), len(doc.edus)))
                 if self.save_preprocessed_doc:
                     print 'Saved segmented document data to %s.' % serialized_doc_filename           
@@ -163,15 +164,12 @@ class DiscourseParser():
             if options.verbose:
                 for e in doc.edus:
                     print e
-            
-                 
+
         except Exception, e:
             print "*** Segmentation failed ***"
-            print traceback.print_exc()
-               
+            print traceback.print_exc()               
             raise e
-        
-        
+
         try:    
             ''' Step 2: build text-level discourse tree '''
             if self.skip_parsing:
@@ -256,7 +254,6 @@ def main(options, args):
             log_fname = os.path.join(paths.LOGS_PATH, 'log_%s.txt' % (output_dir if output_dir else datetime.now().strftime('%Y_%m_%d_%H_%M_%S')))
             log_writer = open(log_fname, 'w')
 
-        
         if options.filelist:
             file_fname = args[start_arg]
             if not os.path.exists(file_fname) or not os.path.isfile(file_fname):
@@ -314,7 +311,6 @@ def main(options, args):
             parser.unload()
 
 
-
 v = '1.0'
 if __name__ == '__main__':
     usage = "Usage: %prog [options] input_file/dir"
@@ -339,16 +335,20 @@ if __name__ == '__main__':
                          action="store_true", dest="logging", default=False,
                          help="Perform logging while parsing.")
     optParser.add_option("-e", "--save",
-                         action="store_true", dest="save_preprocessed_doc", default=False,
+                         action="store_true", dest="save_preprocessed_doc",
+                         default=False,
                          help="Save preprocessed document into serialized file for future use.")
-    
-    
+    # MM add option to load segmentation from the .edus files that result
+    # from calling this parser with the --skip_parsing option
+    optParser.add_option('-r', '--load_edus',
+                         dest='load_edus', default=False,
+                         help="Read segmentation from .edus files in folder")
+    # end MM
        
     (options, args) = optParser.parse_args()
     if len(args) == 0:
         optParser.print_help()
         sys.exit(1)
-                
-        
+
     main(options, args)
     

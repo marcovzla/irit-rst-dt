@@ -127,6 +127,8 @@ class Preprocesser:
                 # MM
                 if (os.path.basename(raw_filename) == 'wsj_0655.out'
                     and para_idx == 8):
+                    # this error is in the original text *and* is redone
+                    # by the segmenter:
                     # the segmenter wrongly splits on "[{Mr.] [Ortega's}]"
                     # => repair by merging sentences
                     raw_sentences = ([raw_sentences[0] + ' '
@@ -134,24 +136,30 @@ class Preprocesser:
                                      + raw_sentences[2:])
                 elif (os.path.basename(raw_filename) == 'wsj_1169.out'
                       and para_idx == 0):
+                    # this error is in the original text *and* is redone
+                    # by the segmenter:
                     # "[Murata Mfg.] [Co.]"
                     raw_sentences = ([raw_sentences[0] + ' '
                                       + raw_sentences[1]]
                                      + raw_sentences[2:])
                 elif (os.path.basename(raw_filename) == 'wsj_1169.out'
                       and para_idx == 2):
+                    # this error is in the original text *and* is redone
+                    # by the segmenter:
                     # [G.m.b.] [H.]
                     raw_sentences = ([raw_sentences[0] + ' '
                                       + raw_sentences[1]]
                                      + raw_sentences[2:])
                 elif (os.path.basename(raw_filename) == 'wsj_1331.out'
                       and para_idx == 9):
+                    # text is correct, only the segmenter makes an error:
                     # [all over again.] ['"]
                     raw_sentences = (raw_sentences[:1]
                                      + [raw_sentences[1] + ' '
                                         + raw_sentences[2]])
                 elif (os.path.basename(raw_filename) == 'wsj_1376.out'
                       and para_idx == 5):
+                    # text is correct, only the segmenter makes an error:
                     # [society.] [. . .]
                     raw_sentences = (raw_sentences[:1]
                                      + [raw_sentences[1] + ' '
@@ -169,18 +177,21 @@ class Preprocesser:
                     raw_sentences[5] = raw_sentences[5][2:]
                 elif (os.path.basename(raw_filename) == 'wsj_1376.out'
                       and para_idx == 21):
+                    # error by the segmenter
                     raw_sentences[0] = (raw_sentences[0] + ' '
                                         + raw_sentences[1] + ' '
                                         + raw_sentences[2])
                     raw_sentences = raw_sentences[:1] + raw_sentences[3:]
                 elif (os.path.basename(raw_filename) == 'wsj_1380.out'
                       and para_idx == 6):
+                    # error by the segmenter
                     # [... Boston Inc. .] ['s First ...]
                     raw_sentences[0] = (raw_sentences[0] + ' '
                                         + raw_sentences[1])
                     raw_sentences = raw_sentences[:1]
                 elif (os.path.basename(raw_filename) == 'wsj_2385.out'
                       and para_idx in [4, 5, 12]):
+                    # error by the segmenter
                     # double dash is equivalent here to ":", hence same
                     # sentence, ex: [... Co. .][-- ...]
                     raw_sentences[0] = (raw_sentences[0] + ' '
@@ -188,6 +199,7 @@ class Preprocesser:
                     raw_sentences = raw_sentences[:1]
                 elif (os.path.basename(raw_filename) == 'wsj_2386.out'
                       and para_idx == 2):
+                    # error by the segmenter
                     raw_sentences[0] = (raw_sentences[0] + ' '
                                         + raw_sentences[1])
                     raw_sentences = raw_sentences[:1] + raw_sentences[2:]
