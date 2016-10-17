@@ -46,8 +46,8 @@ OUT_FENG2 = os.path.join('/home/mmorey/melodi/rst/feng_hirst/gCRF_dist/texts/res
 # output of Ji's parser
 OUT_JI = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
 # output of Hayashi et al.'s parsers
-OUT_HAYASHI_HILDA = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/dep/li/')
-OUT_HAYASHI_MST = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/cons/trans_li/')
+OUT_HAYASHI_MST = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/dep/li/')
+OUT_HAYASHI_HILDA = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/cons/trans_li/')
 
 
 def main():
