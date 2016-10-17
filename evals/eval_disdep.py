@@ -18,11 +18,13 @@ if __name__ == '__main__':
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
+                                 'hayashi_hilda', 'hayashi_mst',
                                  'ours'],
                         help="Author(s) of the predictions")
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
+                                 'hayashi_hilda', 'hayashi_mst',
                                  'ours'],
                         help="Author of the reference")
     parser.add_argument('--nary_enc', default='chain',
@@ -38,12 +40,16 @@ if __name__ == '__main__':
     files_true = {os.path.basename(f).rsplit('.')[0]: f
                   for f in glob(os.path.join(dir_true, '*.dis_dep'))}
     # table header
-    print('\t'.join(['parser',
-                     'a', 'l', 'n', 'r',
-                     'al', 'an', 'ar',
-                     'aln', 'alr',
-                     'alnr',
-                     'support']))
+    len_author_str = max(len(x) for x in authors_pred)
+    print('\t'.join([
+        '{parser_name: <{width}}'.format(
+            parser_name='parser', width=len_author_str),
+        'a', 'l', 'n', 'r',
+        'al', 'an', 'ar',
+        'aln', 'alr',
+        'alnr',
+        'support'
+    ]))
 
     for author_pred in authors_pred:
         dir_pred = os.path.join('TMP_disdep', nary_enc, author_pred, 'test')
@@ -98,10 +104,13 @@ if __name__ == '__main__':
                             cnt_alr += 1
                         if ok_a and ok_l and ok_n and ok_r:
                             cnt_alnr += 1
-        print('\t'.join([author_pred]
-                        + ['{:.4f}'.format(float(cnt_x) / cnt_tot)
-                           for cnt_x in [cnt_a, cnt_l, cnt_n, cnt_r,
-                                         cnt_al, cnt_an, cnt_ar,
-                                         cnt_aln, cnt_alr,
-                                         cnt_alnr]]
-                        + [str(cnt_tot)]))
+        print('\t'.join(
+            ['{parser_name: <{width}}'.format(
+                parser_name=author_pred, width=len_author_str)]
+            + ['{:.4f}'.format(float(cnt_x) / cnt_tot)
+               for cnt_x in [cnt_a, cnt_l, cnt_n, cnt_r,
+                             cnt_al, cnt_an, cnt_ar,
+                             cnt_aln, cnt_alr,
+                             cnt_alnr]]
+            + [str(cnt_tot)]
+        ))

@@ -20,6 +20,7 @@ from educe.rst_dt.rst_wsj_corpus import (DOUBLE_FOLDER, TEST_FOLDER,
                                          TRAIN_FOLDER)
 
 from evals.gcrf_tree_format import load_gcrf_dtrees
+from evals.hayashi_deps import load_hayashi_dtrees
 from evals.ji import load_ji_dtrees
 
 
@@ -33,8 +34,9 @@ RST_DOUBLE = os.path.join(RST_CORPUS, DOUBLE_FOLDER)
 RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
                            'educe', 'rst_dt',
                            'rst_112to18.txt')
-REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
-
+REL_CONV_BASE = RstRelationConverter(RELMAP_FILE)
+REL_CONV = REL_CONV_BASE.convert_tree
+REL_CONV_DTREE = REL_CONV_BASE.convert_dtree
 # output of Joty's parser
 OUT_JOTY = os.path.join('/home/mmorey/melodi/rst/joty/Doc-level/')
 # output of Feng & Hirst's parser
@@ -43,6 +45,9 @@ OUT_FENG = os.path.join('/home/mmorey/melodi/rst/feng_hirst/phil/tmp/')
 OUT_FENG2 = os.path.join('/home/mmorey/melodi/rst/feng_hirst/gCRF_dist/texts/results/test_batch_gold_seg')
 # output of Ji's parser
 OUT_JI = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
+# output of Hayashi et al.'s parsers
+OUT_HAYASHI_HILDA = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/dep/li/')
+OUT_HAYASHI_MST = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/cons/trans_li/')
 
 
 def main():
@@ -55,7 +60,8 @@ def main():
                         help="Encoding for n-ary nodes")
     parser.add_argument('--author', default='gold',
                         choices=['gold', 'silver',
-                                 'joty', 'feng', 'feng2', 'ji'],
+                                 'joty', 'feng', 'feng2', 'ji',
+                                 'hayashi_hilda', 'hayashi_mst'],
                         help="Author of the version of the corpus")
     parser.add_argument('--split', default='test',
                         choices=['train', 'test', 'double'],
@@ -129,6 +135,17 @@ def main():
             raise ValueError("The output of Ji & Eisenstein's parser is "
                              "available for the 'test' split only")
         dtrees = load_ji_dtrees(OUT_JI, REL_CONV)
+    elif author == 'hayashi_mst':
+        if corpus_split != 'test':
+            raise ValueError("The output of Hayashi et al.'s parser is "
+                             "available for the 'test' split only")
+        dtrees = load_hayashi_dtrees(OUT_HAYASHI_MST, REL_CONV_DTREE)
+    elif author == 'hayashi_hilda':
+        if corpus_split != 'test':
+            raise ValueError("The output of Hayashi et al.'s parser is "
+                             "available for the 'test' split only")
+        dtrees = load_hayashi_dtrees(OUT_HAYASHI_HILDA, REL_CONV_DTREE)
+            
     # do dump
     dump_disdep_files(dtrees.values(), out_dir)
 
