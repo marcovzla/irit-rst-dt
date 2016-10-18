@@ -1,0 +1,7 @@
+name: irit-rst-dt
+dependencies:
+  - python=2.7
+  - nltk
+  - scikit-learn
+  - pip:
+    - "--editable=git+https://github.com/nlhepler/pydot.git#egg=pydot"

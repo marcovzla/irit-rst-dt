@@ -122,7 +122,7 @@ parsed/mrg/wsj)
 
 # CORENLP_OUT_DIR = None
 # CORENLP_OUT_DIR = '/projets/melodi/corpus/rst-dt-corenlp-2015-01-29'
-CORENLP_OUT_DIR = '/home/mmorey/corpora/rst-dt-corenlp-2015-01-29'
+CORENLP_OUT_DIR = '/home/mmorey/corpora/rst-dt/rst-dt-corenlp-2015-01-29'
 """
 Where to read parses from CoreNLP from
 """
