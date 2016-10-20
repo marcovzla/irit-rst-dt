@@ -15,8 +15,6 @@ from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.document_plus import align_edus_with_paragraphs
 #
 from attelo.io import load_edus
-from attelo.metrics.constituency import (parseval_detailed_report,
-                                         parseval_report)
 from attelo.metrics.deptree import compute_uas_las
 
 

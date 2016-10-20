@@ -3,6 +3,11 @@
 This is a reimplementation of this evaluation procedure.
 """
 
+from educe.rst_dt.metrics.rst_parseval import (rst_parseval_report,
+                                               rst_parseval_detailed_report)
+
+
+
 # FIXME legacy code brutally dumped here, broken
 def twisted_eval_li2014(data_true, data_pred):
     """Run Parseval on transformed gold trees, as in (Li et al., 2014).
@@ -86,12 +91,12 @@ def eval_distortion_gold(corpus, nuc_strategy, rank_strategy,
             chn_bin_srtree_ref)
         gold_twis[doc_name] = chn_bin_rtree_ref
 
-    print(parseval_report(gold_orig, gold_twis,
-                          metric_types=[x[0] for x in LBL_FNS],
-                          digits=4))
+    print(rst_parseval_report(gold_orig, gold_twis,
+                              metric_types=[x[0] for x in LBL_FNS],
+                              digits=4))
     # detailed report on S+N+R
-    print(parseval_detailed_report(ctree_true, ctree_pred,
-                                   metric_type='S+R'))
+    print(rst_parseval_detailed_report(ctree_true, ctree_pred,
+                                       metric_type='S+R'))
 
 
 def comparative_distortion_on_gold():

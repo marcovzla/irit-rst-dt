@@ -15,9 +15,9 @@ from educe.rst_dt.corpus import (RstRelationConverter,
 from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 from educe.rst_dt.deptree import RstDepTree
+from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
+                                               rst_parseval_report)
 #
-from attelo.metrics.constituency import (parseval_detailed_report,
-                                         parseval_report)
 from attelo.metrics.deptree import compute_uas_las, compute_uas_las_undirected
 
 # local to this package
@@ -173,9 +173,6 @@ def main():
                         help="Binarize the reference ctree for the eval")
     parser.add_argument('--simple_rsttree', action='store_true',
                         help="Binarize ctree and move relations up")
-    parser.add_argument('--span_sel', default='none',
-                        choices=['none', 'leaves', 'non-leaves'],
-                        help="Binarize ctree and move relations up")
     parser.add_argument('--per_doc', action='store_true',
                         help="Doc-averaged scores (cf. Ji's eval)")
     #
@@ -186,13 +183,7 @@ def main():
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
     simple_rsttree = args.simple_rsttree
-    span_sel = args.span_sel
-    if span_sel == 'none':
-        span_sel = None
-    if simple_rsttree:
-        # the point of evaluating on simple rst trees is to get leaves
-        # out of the way
-        span_sel = 'non-leaves'
+
     # "per_doc = True" computes p, r, f as in DPLP: compute scores per doc
     # then average over docs
     # it should be False, except for comparison with the DPLP paper
@@ -393,6 +384,10 @@ def main():
                                for x in ctree_true_list]
             ctree_pred_list = [SimpleRSTTree.from_rst_tree(x)
                                for x in ctree_pred_list]
+            ctree_type = 'SimpleRST'
+        else:
+            ctree_type = 'RST'
+
         # WIP print SimpleRSTTrees
         if not os.path.exists('gold'):
             os.makedirs('gold')
@@ -411,24 +406,25 @@ def main():
                 doc_names, ctree_true_list, ctree_pred_list):
             with codecs.open(parser_name + '/' + doc_name + '.c_eval',
                              mode='w', encoding='utf-8') as f:
-                print(parseval_report([ct_true], [ct_pred], digits=4,
-                                      span_sel=span_sel,
-                                      per_doc=per_doc,
-                                      stringent=STRINGENT),
+                print(rst_parseval_report([ct_true], [ct_pred],
+                                          ctree_type=ctree_type,
+                                          digits=4,
+                                          per_doc=per_doc,
+                                          stringent=STRINGENT),
                       file=f)
         # end WIP
         # FIXME
         # compute and print PARSEVAL scores
         print(parser_name)
-        print(parseval_report(ctree_true_list, ctree_pred_list, digits=4,
-                              span_sel=span_sel,
-                              per_doc=per_doc,
-                              stringent=STRINGENT))
+        print(rst_parseval_report(ctree_true_list, ctree_pred_list,
+                                  ctree_type=ctree_type, digits=4,
+                                  per_doc=per_doc,
+                                  stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:
-            print(parseval_detailed_report(ctree_true_list, ctree_pred_list,
-                                           metric_type='S+R',
-                                           span_sel=span_sel))
+            print(rst_parseval_detailed_report(
+                ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
+                metric_type='S+R'))
         # end FIXME
 
 
