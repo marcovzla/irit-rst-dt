@@ -25,6 +25,7 @@ from evals.codra import load_codra_ctrees, load_codra_dtrees
 from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
 from evals.ji import load_ji_ctrees, load_ji_dtrees
+from evals.li_qi import load_li_qi_ctrees, load_li_qi_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
                         load_attelo_dtrees)
@@ -91,6 +92,8 @@ JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/
 FENG_DIR = '/home/mmorey/melodi/rst/feng_hirst/'
 FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
 FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_seg')
+# Li Qi's parser
+LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/li_qi/result'
 
 # level of detail for parseval
 DETAILED = False
@@ -153,6 +156,7 @@ def main():
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
+                                 'li_qi',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -162,6 +166,7 @@ def main():
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
+                                 'li_qi',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -224,101 +229,111 @@ def main():
     c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
     d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
 
-    if 'feng' in authors_pred:
-        c_preds.append(
-            ('feng', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
-        )
-        d_preds.append(
-            ('feng', load_feng_dtrees(FENG1_OUT_DIR, REL_CONV,
-                                      nary_enc='chain'))
-        )
+    for author_pred in authors_pred:
+        if author_pred == 'li_qi':
+            c_preds.append(
+                ('li_qi', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('li_qi', load_li_qi_dtrees(LI_QI_OUT_DIR, REL_CONV,
+                                            nary_enc='chain'))
+            )
 
-    if 'feng2' in authors_pred:
-        c_preds.append(
-            ('gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
-        )
-        d_preds.append(
-            ('gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
-                                      nary_enc='chain'))
-        )
+        if author_pred == 'feng':
+            c_preds.append(
+                ('gSVM', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('gSVM', load_feng_dtrees(FENG1_OUT_DIR, REL_CONV,
+                                          nary_enc='chain'))
+            )
 
-    if 'joty' in authors_pred:
-        # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
-        c_preds.append(
-            ('joty', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
-        )
-        d_preds.append(
-            ('joty', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
-                                       nary_enc='chain'))
-        )
-        # joty-{chain,tree} would be the same except nary_enc='tree' ;
-        # the nary_enc does not matter because codra outputs binary ctrees,
-        # hence both encodings result in (the same) strictly ordered dtrees
+        if author_pred == 'feng2':
+            c_preds.append(
+                ('gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
+                                          nary_enc='chain'))
+            )
 
-    if 'ji' in authors_pred:
-        # DPLP outputs RST ctrees in the form of lists of spans;
-        # load_ji_dtrees maps them to RST dtrees
-        c_preds.append(
-            ('ji', load_ji_ctrees(JI_OUT_DIR, REL_CONV))
-        )
-        d_preds.append(
-            ('ji', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
-                                  nary_enc='chain'))
-        )
-        # ji-{chain,tree} would be the same except nary_enc='tree' ;
-        # the nary_enc does not matter because codra outputs binary ctrees,
-        # hence both encodings result in (the same) strictly ordered dtrees
+        if author_pred == 'joty':
+            # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
+            c_preds.append(
+                ('TSP 1-1', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('TSP 1-1', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
+                                              nary_enc='chain'))
+            )
+            # joty-{chain,tree} would be the same except nary_enc='tree' ;
+            # the nary_enc does not matter because codra outputs binary ctrees,
+            # hence both encodings result in (the same) strictly ordered dtrees
 
-    if 'ours_chain' in authors_pred:
-        # Eisner, predicted syntax, chain
-        c_preds.append(
-            ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                              nuc_clf, rnk_clf))
-        )
-        d_preds.append(
-            ('ours-chain', load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                              nuc_clf, rnk_clf))
-        )
+        if author_pred == 'ji':
+            # DPLP outputs RST ctrees in the form of lists of spans;
+            # load_ji_dtrees maps them to RST dtrees
+            c_preds.append(
+                ('DPLP', load_ji_ctrees(JI_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('DPLP', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
+                                        nary_enc='chain'))
+            )
+            # ji-{chain,tree} would be the same except nary_enc='tree' ;
+            # the nary_enc does not matter because codra outputs binary ctrees,
+            # hence both encodings result in (the same) strictly ordered dtrees
 
-    if 'ours_tree' in authors_pred:
-        # Eisner, predicted syntax, tree + same-unit
-        c_preds.append(
-            ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED,
-                                             EDUS_FILE,
-                                             nuc_clf, rnk_clf))
-        )
-        d_preds.append(
-            ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
-                                             EDUS_FILE,
-                                             nuc_clf, rnk_clf))
-        )
-    if 'ours_tree_su' in authors_pred:
-        # Eisner, predicted syntax, tree + same-unit
-        c_preds.append(
-            ('ours-tree-su', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                                EDUS_FILE,
-                                                nuc_clf, rnk_clf))
-        )
-        d_preds.append(
-            ('ours-tree-su', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                                EDUS_FILE,
-                                                nuc_clf, rnk_clf))
-        )
+        if author_pred == 'ours_chain':
+            # Eisner, predicted syntax, chain
+            c_preds.append(
+                ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                                  nuc_clf, rnk_clf))
+            )
+            d_preds.append(
+                ('ours-chain', load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                                  nuc_clf, rnk_clf))
+            )
 
-    if False:  # FIXME repair (or forget) these
-        print('Eisner, predicted syntax + same-unit')
-        load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                         EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
-                                         nuc_clf, rnk_clf,
-                                         detailed=False)
-        print('======================')
+        if author_pred == 'ours_tree':
+            # Eisner, predicted syntax, tree + same-unit
+            c_preds.append(
+                ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED,
+                                                 EDUS_FILE,
+                                                 nuc_clf, rnk_clf))
+            )
+            d_preds.append(
+                ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
+                                                 EDUS_FILE,
+                                                 nuc_clf, rnk_clf))
+            )
+        if author_pred == 'ours_tree_su':
+            # Eisner, predicted syntax, tree + same-unit
+            c_preds.append(
+                ('ours-tree-su', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                                    EDUS_FILE,
+                                                    nuc_clf, rnk_clf))
+            )
+            d_preds.append(
+                ('ours-tree-su', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                                    EDUS_FILE,
+                                                    nuc_clf, rnk_clf))
+            )
 
-        print('Eisner, gold syntax')
-        load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                         EISNER_OUT_SYN_GOLD, EDUS_FILE,
-                                         nuc_clf, rnk_clf,
-                                         detailed=False)
-        print('======================')
+        if False:  # FIXME repair (or forget) these
+            print('Eisner, predicted syntax + same-unit')
+            load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                             EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                                             nuc_clf, rnk_clf,
+                                             detailed=False)
+            print('======================')
+
+            print('Eisner, gold syntax')
+            load_deptrees_from_attelo_output(ctree_true, dtree_true,
+                                             EISNER_OUT_SYN_GOLD, EDUS_FILE,
+                                             nuc_clf, rnk_clf,
+                                             detailed=False)
+            print('======================')
 
     # dependency eval
 
