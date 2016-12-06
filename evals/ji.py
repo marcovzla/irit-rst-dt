@@ -16,7 +16,7 @@ from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.rst_wsj_corpus import TEST_FOLDER
 
 # original RST corpus
-RST_CORPUS = os.path.join('/home/mmorey/corpora/rst_discourse_treebank/data')
+RST_CORPUS = os.path.join('/home/mmorey/corpora/rst-dt/rst_discourse_treebank/data')
 RST_MAIN_TEST = os.path.join(RST_CORPUS, TEST_FOLDER)
 
 

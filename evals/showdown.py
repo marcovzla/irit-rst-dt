@@ -18,12 +18,16 @@ from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
                                                rst_parseval_report)
 #
-from attelo.metrics.deptree import compute_uas_las, compute_uas_las_undirected
+from attelo.metrics.deptree import (compute_uas_las,
+                                    compute_uas_las_undirected)
 
 # local to this package
 from evals.codra import load_codra_ctrees, load_codra_dtrees
 from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
+from evals.hayashi_cons import (load_hayashi_hilda_ctrees,
+                                load_hayashi_hilda_dtrees)
+from evals.hayashi_deps import load_hayashi_dtrees
 from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.li_qi import load_li_qi_ctrees, load_li_qi_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
@@ -94,20 +98,31 @@ FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
 FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_seg')
 # Li Qi's parser
 LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/li_qi/result'
+# Hayashi's HILDA
+HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/hayashi/SIGDIAL'
+HAYASHI_HILDA_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/cons/HILDA')
 
 # level of detail for parseval
 DETAILED = False
+EVAL_LI_DEP = True
 STRINGENT = False
+# additional dependency metrics
+INCLUDE_LS = False
+UNDIRECTED_DEPS = False
+EVAL_NUC_RANK = True
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
+NUC_CONSTANT = None  # only useful for NUC_STRATEGY='constant'
 RNK_STRATEGY = 'sdist-edist-rl'
 RNK_PRIORITY_SU = True
 
 
-def setup_dtree_postprocessor(nary_enc):
+def setup_dtree_postprocessor(nary_enc='chain', order='strict',
+                              nuc_strategy=NUC_STRATEGY,
+                              nuc_constant=NUC_CONSTANT,
+                              rnk_strategy=RNK_STRATEGY,
+                              rnk_prioritize_same_unit=RNK_PRIORITY_SU):
     """Setup the nuclearity and rank classifiers to flesh out dtrees."""
-    # tie the order with the encoding for n-ary nodes
-    order = 'weak' if nary_enc == 'tree' else 'strict'
     # load train section of the RST corpus, fit (currently dummy) classifiers
     # for nuclearity and rank
     reader_train = RstReader(CD_TRAIN)
@@ -134,12 +149,13 @@ def setup_dtree_postprocessor(nary_enc):
         y_nuc_train.append(dt.nucs)
         y_rnk_train.append(dt.ranks)
     # nuclearity clf
-    nuc_clf = DummyNuclearityClassifier(strategy=NUC_STRATEGY)
+    nuc_clf = DummyNuclearityClassifier(strategy=nuc_strategy,
+                                        constant=nuc_constant)
     nuc_clf.fit(X_train, y_nuc_train)
     # rank clf
-    rnk_clf = InsideOutAttachmentRanker(strategy=RNK_STRATEGY,
-                                        prioritize_same_unit=RNK_PRIORITY_SU,
-                                        order=order)
+    rnk_clf = InsideOutAttachmentRanker(
+        strategy=rnk_strategy, prioritize_same_unit=rnk_prioritize_same_unit,
+        order=order)
     rnk_clf.fit(X_train, y_rnk_train)
     return nuc_clf, rnk_clf
 
@@ -156,7 +172,7 @@ def main():
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi',
+                                 'li_qi', 'hayashi_hilda',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -166,7 +182,7 @@ def main():
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi',
+                                 'li_qi', 'hayashi_hilda',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -200,7 +216,10 @@ def main():
 
     # 0. setup the postprocessors to flesh out unordered dtrees into ordered
     # ones with nuclearity
-    nuc_clf, rnk_clf = setup_dtree_postprocessor(nary_enc_pred)
+    # * tie the order with the encoding for n-ary nodes
+    order = 'weak' if nary_enc_pred == 'tree' else 'strict'
+    nuc_clf, rnk_clf = setup_dtree_postprocessor(nary_enc=nary_enc_pred,
+                                                 order=order)
 
     # the eval compares parses for the test section of the RST corpus
     reader_test = RstReader(CD_TEST)
@@ -230,6 +249,16 @@ def main():
     d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
 
     for author_pred in authors_pred:
+        if author_pred == 'hayashi_hilda':
+            c_preds.append(
+                ('hayashi_hilda', load_hayashi_hilda_ctrees(
+                    HAYASHI_HILDA_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('hayashi_hilda', load_hayashi_hilda_dtrees(
+                    HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain'))
+            )
+
         if author_pred == 'li_qi':
             c_preds.append(
                 ('li_qi', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
@@ -342,7 +371,13 @@ def main():
     digits = 4
     width = max(len(parser_name) for parser_name, _ in d_preds)
 
-    headers = ["UAS", "LAS", "LS", "UUAS", "ULAS"]
+    headers = ["UAS", "LAS"]
+    if INCLUDE_LS:
+        headers += ["LS"]
+    if EVAL_NUC_RANK:
+        headers += ["LAS+N", "LAS+O", "LAS+N+O"]
+    if UNDIRECTED_DEPS:
+        headers += ["UUAS", "ULAS"]
     fmt = '%% %ds' % width  # first col: parser name
     fmt += '  '
     fmt += ' '.join(['% 9s' for _ in headers])
@@ -367,22 +402,29 @@ def main():
                              mode='w', encoding='utf-8') as f:
                 print(', '.join('{:.4f}'.format(x)
                                 for x in compute_uas_las(
-                                        [dt_true], [dt_pred])),
+                                        [dt_true], [dt_pred],
+                                        include_ls=INCLUDE_LS,
+                                        include_las_n_o_no=EVAL_NUC_RANK)),
                       file=f)
-                # WIP scores for undirected edges
-                print(', '.join('{:.4f}'.format(x)
-                                for x in compute_uas_las_undirected(
-                                        [dt_true], [dt_pred])),
-                      file=f)
-
+                if UNDIRECTED_DEPS:
+                    # scores for undirected edges
+                    print(', '.join('{:.4f}'.format(x)
+                                    for x in compute_uas_las_undirected(
+                                            [dt_true], [dt_pred])),
+                          file=f)
         # end WIP print
-        score_uas, score_las, score_ls = compute_uas_las(dtree_true_list,
-                                                         dtree_pred_list)
-        score_uuas, score_ulas = compute_uas_las_undirected(dtree_true_list,
-                                                            dtree_pred_list)
+
+        all_scores = []
+        all_scores += list(compute_uas_las(
+            dtree_true_list, dtree_pred_list, include_ls=INCLUDE_LS,
+            include_las_n_o_no=EVAL_NUC_RANK))
+        if UNDIRECTED_DEPS:
+            score_uuas, score_ulas = compute_uas_las_undirected(
+                dtree_true_list, dtree_pred_list)
+            all_scores += [score_uuas, score_ulas]
         # append to report
         values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
-        for v in (score_uas, score_las, score_ls, score_uuas, score_ulas):
+        for v in all_scores:
             values += ["{0:0.{1}f}".format(v, digits)]
         report += fmt % tuple(values)
     # end table content
@@ -425,6 +467,7 @@ def main():
                                           ctree_type=ctree_type,
                                           digits=4,
                                           per_doc=per_doc,
+                                          add_trivial_spans=EVAL_LI_DEP,
                                           stringent=STRINGENT),
                       file=f)
         # end WIP
@@ -434,6 +477,7 @@ def main():
         print(rst_parseval_report(ctree_true_list, ctree_pred_list,
                                   ctree_type=ctree_type, digits=4,
                                   per_doc=per_doc,
+                                  add_trivial_spans=EVAL_LI_DEP,
                                   stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:

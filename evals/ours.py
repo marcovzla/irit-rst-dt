@@ -72,15 +72,12 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
     """
     dtree_pred = dict()  # predicted dtrees
     # * setup...
-    # load EDUs as they are known to attelo (sigh)
-    # and predicted edges on these EDUs
-    att_edus = load_edus(edus_file)
-    edges_pred = load_attelo_output_file(output_file)
-    # rebuild educe EDUs from their attelo description
-    # and group them by doc_name
+    # load EDUs as they are known to attelo (sigh): rebuild educe EDUs
+    # from their attelo description and group them by doc_name
     educe_edus = defaultdict(list)
     edu2sent_idx = defaultdict(dict)
     gid2num = dict()
+    att_edus = load_edus(edus_file)
     for att_edu in att_edus:
         # doc name
         doc_name = att_edu.grouping
@@ -103,7 +100,8 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
                                      for e in doc_educe_edus])
                          for doc_name, doc_educe_edus in educe_edus.items()}
 
-    # rebuild RstDepTrees
+    # load predicted edges, on these EDUs, into RstDepTrees
+    edges_pred = load_attelo_output_file(output_file)
     for doc_name, es_pred in sorted(edges_pred.items()):
         # get educe EDUs
         doc_educe_edus = educe_edus[doc_name]
