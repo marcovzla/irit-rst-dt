@@ -109,16 +109,26 @@ if __name__ == "__main__":
     reader_test = RstReader(CD_TEST)
     corpus_test = reader_test.slurp()
 
+    # choice of predictions: granularity of relations
+    RST_RELS = 'coarse'
+    if RST_RELS == 'coarse':
+        PRED_FILES = COARSE_FILES
+    else:
+        PRED_FILES = FINE_FILES
+    # eval procedure: the one in the parser of Li et al. vs standard one
+    EVAL_LI = True
+
     # setup conversion from c- to d-tree and back, and eval type
     nary_enc = 'tree'
-    eval_li = True
 
-    if eval_li:
+    if EVAL_LI:
+        # reconstruction of the c-tree
         order = 'strict'
         nuc_strategy = 'constant'
         nuc_constant = NUC_S
         rnk_strategy = 'lllrrr'
         rnk_prioritize_same_unit = False
+        # eval
         TWIST_GOLD = True
         ADD_TRIVIAL_SPANS = True
     else:  # comparable setup to what we use for our own parsers
@@ -140,7 +150,9 @@ if __name__ == "__main__":
     labelset_true = Counter()
     for doc_id, ct_true in sorted(corpus_test.items()):
         doc_name = doc_id.doc
-        ct_true = REL_CONV(ct_true)  # map fine to coarse rels
+        if RST_RELS == 'coarse':
+            # map fine to coarse rels
+            ct_true = REL_CONV(ct_true)
         ctree_true[doc_name] = ct_true
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
         # dirty hack: lowercase ROOT
@@ -151,7 +163,7 @@ if __name__ == "__main__":
         labelset_true.update(dt_true.labels[1:])
 
     # load parser output
-    for fname in COARSE_FILES:
+    for fname in PRED_FILES:
         dtree_pred = dict()
         labelset_pred = Counter()
         #
@@ -180,12 +192,14 @@ if __name__ == "__main__":
             dt_pred.sent_idx = [0] + edu2sent  # 0 for fake root + dirty
             dtree_pred[doc_name] = dt_pred
         # end WIP
-        expected_labelset = ['attribution', 'background', 'cause', 'comparison', 'condition', 'contrast', 'elaboration', 'enablement', 'evaluation', 'explanation', 'joint', 'manner-means', 'root', 'same-unit', 'summary', 'temporal', 'textual', 'topic-change', 'topic-comment']
-        assert sorted(labelset_pred.keys()) == expected_labelset
-        # wsj_1189 has a weird "span" label in a multinuclear rel at [7--9]
-        # see footnote in Hayashi et al's SIGDIAL 2016 paper
-        assert sorted(labelset_true.keys()) == sorted(
-            expected_labelset + ['span'])
+
+        if RST_RELS == 'coarse':
+            expected_labelset = ['attribution', 'background', 'cause', 'comparison', 'condition', 'contrast', 'elaboration', 'enablement', 'evaluation', 'explanation', 'joint', 'manner-means', 'root', 'same-unit', 'summary', 'temporal', 'textual', 'topic-change', 'topic-comment']
+            assert sorted(labelset_pred.keys()) == expected_labelset
+            # wsj_1189 has a weird "span" label in a multinuclear rel at [7--9]
+            # see footnote in Hayashi et al's SIGDIAL 2016 paper
+            assert sorted(labelset_true.keys()) == sorted(
+                expected_labelset + ['span'])
 
         # compute UAS and LAS on the _true values from the corpus and
         # _pred Educe RstDepTrees re-built from their output files
