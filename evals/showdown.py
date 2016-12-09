@@ -27,7 +27,8 @@ from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
 from evals.hayashi_cons import (load_hayashi_hilda_ctrees,
                                 load_hayashi_hilda_dtrees)
-from evals.hayashi_deps import load_hayashi_dtrees
+from evals.hayashi_deps import (load_hayashi_dep_dtrees,
+                                load_hayashi_dep_ctrees)
 from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.li_qi import load_li_qi_ctrees, load_li_qi_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
@@ -43,7 +44,9 @@ CD_TEST = os.path.join(CORPUS_DIR, 'TEST')
 RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
                            'educe', 'rst_dt',
                            'rst_112to18.txt')
-REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
+REL_CONV_BASE = RstRelationConverter(RELMAP_FILE)
+REL_CONV = REL_CONV_BASE.convert_tree
+REL_CONV_DTREE = REL_CONV_BASE.convert_dtree
 
 
 #
@@ -51,9 +54,14 @@ REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
 #
 
 # * syntax: pred vs gold
+# old-style .edu_input: whole test set
 EDUS_FILE = os.path.join('/home/mmorey/melodi',
                          'irit-rst-dt/TMP/syn_gold_coarse',
                          'TEST.relations.sparse.edu_input')
+
+# new style .edu_input: one file per doc in test set
+EDUS_FILE_PAT = "TMP/latest/data/TEST/{}.relations.edu-pairs.sparse.edu_input"
+
 # outputs of parsers
 EISNER_OUT_SYN_PRED = os.path.join(
     '/home/mmorey/melodi',
@@ -101,10 +109,10 @@ LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/li_qi/result'
 # Hayashi's HILDA
 HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/hayashi/SIGDIAL'
 HAYASHI_HILDA_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/cons/HILDA')
+HAYASHI_MST_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/dep/li')
 
 # level of detail for parseval
 DETAILED = False
-EVAL_LI_DEP = True
 STRINGENT = False
 # additional dependency metrics
 INCLUDE_LS = False
@@ -172,7 +180,7 @@ def main():
     parser.add_argument('authors_pred', nargs='+',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi', 'hayashi_hilda',
+                                 'li_qi', 'hayashi_hilda', 'hayashi_mst',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -182,7 +190,7 @@ def main():
     parser.add_argument('--author_true', default='gold',
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi', 'hayashi_hilda',
+                                 'li_qi', 'hayashi_hilda', 'hayashi_mst',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -194,8 +202,13 @@ def main():
                         help="Binarize the reference ctree for the eval")
     parser.add_argument('--simple_rsttree', action='store_true',
                         help="Binarize ctree and move relations up")
+    # * non-standard evals
     parser.add_argument('--per_doc', action='store_true',
                         help="Doc-averaged scores (cf. Ji's eval)")
+    parser.add_argument('--eval_li_dep', action='store_true',
+                        help=("Evaluate as in the dep parser of Li et al. "
+                              "2014: all relations are NS, spiders map to "
+                              "left-heavy branching, three trivial spans "))
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -209,6 +222,11 @@ def main():
     # then average over docs
     # it should be False, except for comparison with the DPLP paper
     per_doc = args.per_doc
+    # "eval_li_dep = True" replaces the original nuclearity and order with
+    # heuristically determined values for _pred but also _true, and adds
+    # three trivial spans
+    eval_li_dep = args.eval_li_dep
+
     #
     if binarize_true and nary_enc_true != 'chain':
         raise ValueError("--binarize_true is compatible with "
@@ -259,6 +277,18 @@ def main():
                     HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
 
+        if author_pred == 'hayashi_mst':
+            c_preds.append(
+                ('hayashi_mst', load_hayashi_dep_ctrees(
+                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
+                    nuc_clf, rnk_clf))
+            )
+            d_preds.append(
+                ('hayashi_mst', load_hayashi_dep_dtrees(
+                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
+                    nuc_clf, rnk_clf))
+            )
+
         if author_pred == 'li_qi':
             c_preds.append(
                 ('li_qi', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
@@ -303,11 +333,12 @@ def main():
             # DPLP outputs RST ctrees in the form of lists of spans;
             # load_ji_dtrees maps them to RST dtrees
             c_preds.append(
-                ('DPLP', load_ji_ctrees(JI_OUT_DIR, REL_CONV))
+                ('DPLP', load_ji_ctrees(
+                    JI_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('DPLP', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
-                                        nary_enc='chain'))
+                ('DPLP', load_ji_dtrees(
+                    JI_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
             # ji-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because codra outputs binary ctrees,
@@ -316,25 +347,23 @@ def main():
         if author_pred == 'ours_chain':
             # Eisner, predicted syntax, chain
             c_preds.append(
-                ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                                  nuc_clf, rnk_clf))
+                ('ours-chain', load_attelo_ctrees(
+                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
             d_preds.append(
-                ('ours-chain', load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                                  nuc_clf, rnk_clf))
+                ('ours-chain', load_attelo_dtrees(
+                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
 
         if author_pred == 'ours_tree':
             # Eisner, predicted syntax, tree + same-unit
             c_preds.append(
-                ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED,
-                                                 EDUS_FILE,
-                                                 nuc_clf, rnk_clf))
+                ('ours-tree', load_attelo_ctrees(
+                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
             d_preds.append(
-                ('ours-tree', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
-                                                 EDUS_FILE,
-                                                 nuc_clf, rnk_clf))
+                ('ours-tree', load_attelo_dtrees(
+                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
         if author_pred == 'ours_tree_su':
             # Eisner, predicted syntax, tree + same-unit
@@ -467,7 +496,7 @@ def main():
                                           ctree_type=ctree_type,
                                           digits=4,
                                           per_doc=per_doc,
-                                          add_trivial_spans=EVAL_LI_DEP,
+                                          add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT),
                       file=f)
         # end WIP
@@ -477,7 +506,7 @@ def main():
         print(rst_parseval_report(ctree_true_list, ctree_pred_list,
                                   ctree_type=ctree_type, digits=4,
                                   per_doc=per_doc,
-                                  add_trivial_spans=EVAL_LI_DEP,
+                                  add_trivial_spans=eval_li_dep,
                                   stringent=STRINGENT))
         # detailed report on S+N+R
         if DETAILED:

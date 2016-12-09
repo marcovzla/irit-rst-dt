@@ -17,7 +17,7 @@ from educe.rst_dt.metrics.rst_parseval import rst_parseval_report
 # attelo
 from attelo.metrics.deptree import compute_uas_las as att_compute_uas_las
 # local imports
-from evals.showdown import EDUS_FILE, setup_dtree_postprocessor
+from evals.showdown import EDUS_FILE_PAT, setup_dtree_postprocessor
 
 
 # RST corpus
@@ -29,8 +29,7 @@ RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
                            'educe', 'rst_dt',
                            'rst_112to18.txt')
 REL_CONV = RstRelationConverter(RELMAP_FILE).convert_tree
-# pattern for the .edu_input files of the docs from the test set
-EDUS_FILE_PAT = "TMP/latest/data/TEST/{}.relations.edu-pairs.sparse.edu_input"
+
 
 # output of Li et al.'s parser
 SAVE_DIR = "/home/mmorey/melodi/rst/li_sujian/TextLevelDiscourseParser/mybackup/mstparser-code-116-trunk/mstparser/save"
@@ -64,6 +63,9 @@ FINE_FILES = [
 COARSE_FEAT_FILES = [
     "441.0detailedOut.txt",
 ]
+
+# default file(s) to include ; I picked a coarse-grained one with good scores
+DEFAULT_FILES = ["712.0detailedOut.txt"]
 
 
 def load_output_file(out_file):
@@ -112,14 +114,14 @@ if __name__ == "__main__":
     # choice of predictions: granularity of relations
     RST_RELS = 'coarse'
     if RST_RELS == 'coarse':
-        PRED_FILES = COARSE_FILES
+        PRED_FILES = DEFAULT_FILES  # COARSE_FILES
     else:
         PRED_FILES = FINE_FILES
     # eval procedure: the one in the parser of Li et al. vs standard one
-    EVAL_LI = True
+    EVAL_LI = False
 
     # setup conversion from c- to d-tree and back, and eval type
-    nary_enc = 'tree'
+    nary_enc = 'chain'
 
     if EVAL_LI:
         # reconstruction of the c-tree
@@ -201,16 +203,6 @@ if __name__ == "__main__":
             assert sorted(labelset_true.keys()) == sorted(
                 expected_labelset + ['span'])
 
-        # compute UAS and LAS on the _true values from the corpus and
-        # _pred Educe RstDepTrees re-built from their output files
-        dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
-        dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
-        att_score_uas, att_score_las = att_compute_uas_las(
-            dtree_true_list, dtree_pred_list, include_ls=False,
-            include_las_n_o_no=False)
-        print("{}\tUAS={:.4f}\tLAS={:.4f} (attelo)".format(
-            fname, att_score_uas, att_score_las))
-
         # build predicted c-trees using our heuristics for nuc and rank
         ctree_pred = dict()
         for doc_name, dt_pred in dtree_pred.items():
@@ -242,6 +234,17 @@ if __name__ == "__main__":
                     print(rst_e)
                     raise
                 ctree_true[doc_name] = ct_true
+
+        # compute UAS and LAS on the _true values from the corpus and
+        # _pred Educe RstDepTrees re-built from their output files
+        dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
+        dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
+        sc_uas, sc_las, sc_las_n, sc_las_o, sc_las_no = att_compute_uas_las(
+            dtree_true_list, dtree_pred_list, include_ls=False,
+            include_las_n_o_no=True)
+        print(("{}\tUAS={:.4f}\tLAS={:.4f}\tLAS+N={:.4f}\tLAS+O={:.4f}\t"
+               "LAS+N+O={:.4f}").format(
+                   fname, sc_uas, sc_las, sc_las_n, sc_las_o, sc_las_no))
             
         # compute RST-Parseval of these c-trees
         ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
