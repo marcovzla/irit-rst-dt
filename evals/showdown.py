@@ -22,6 +22,10 @@ from attelo.metrics.deptree import (compute_uas_las,
                                     compute_uas_las_undirected)
 
 # local to this package
+from evals.braud_coling import (load_braud_coling_ctrees,
+                                load_braud_coling_dtrees)
+from evals.braud_eacl import (load_braud_eacl_ctrees,
+                                load_braud_eacl_dtrees)
 from evals.codra import load_codra_ctrees, load_codra_dtrees
 from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
@@ -110,6 +114,10 @@ LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/li_qi/result'
 HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/hayashi/SIGDIAL'
 HAYASHI_HILDA_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/cons/HILDA')
 HAYASHI_MST_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/dep/li')
+# Braud
+BRAUD_COLING_OUT_DIR = '/home/mmorey/melodi/rst/braud/coling16/pred_trees'
+BRAUD_EACL_MONO = '/home/mmorey/melodi/rst/braud/eacl16/best-en-mono/test_it8_beam16'
+BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/braud/eacl16/best-en-cross+dev/test_it10_beam32'
 
 # level of detail for parseval
 DETAILED = False
@@ -181,6 +189,8 @@ def main():
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
                                  'li_qi', 'hayashi_hilda', 'hayashi_mst',
+                                 'braud_coling', 'braud_eacl_mono',
+                                 'braud_eacl_cross_dev',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -191,6 +201,8 @@ def main():
                         choices=['gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
                                  'li_qi', 'hayashi_hilda', 'hayashi_mst',
+                                 'braud_coling', 'braud_eacl_mono',
+                                 'braud_eacl_cross_dev',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -261,12 +273,45 @@ def main():
         # corresponding dtree
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc_true)
         dtree_true[doc_name] = dt_true
-
+    # sorted doc_names, because braud_eacl put all predictions in one file
+    sorted_doc_names = sorted(dtree_true.keys())
     
     c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
     d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
 
     for author_pred in authors_pred:
+        if author_pred == 'braud_coling':
+            c_preds.append(
+                ('braud_coling', load_braud_coling_ctrees(
+                    BRAUD_COLING_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('braud_coling', load_braud_coling_dtrees(
+                    BRAUD_COLING_OUT_DIR, REL_CONV, nary_enc='chain'))
+            )            
+
+        if author_pred == 'braud_eacl_mono':
+            c_preds.append(
+                ('braud_eacl_mono', load_braud_eacl_ctrees(
+                    BRAUD_EACL_MONO, REL_CONV, sorted_doc_names))
+            )
+            d_preds.append(
+                ('braud_eacl_mono', load_braud_eacl_dtrees(
+                    BRAUD_EACL_MONO, REL_CONV, sorted_doc_names,
+                    nary_enc='chain'))
+            )            
+
+        if author_pred == 'braud_eacl_cross_dev':
+            c_preds.append(
+                ('braud_eacl_cross_dev', load_braud_eacl_ctrees(
+                    BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names))
+            )
+            d_preds.append(
+                ('braud_eacl_cross_dev', load_braud_eacl_dtrees(
+                    BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names,
+                    nary_enc='chain'))
+            )            
+
         if author_pred == 'hayashi_hilda':
             c_preds.append(
                 ('hayashi_hilda', load_hayashi_hilda_ctrees(
