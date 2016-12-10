@@ -5,6 +5,7 @@
 from __future__ import absolute_import, print_function
 
 import codecs
+import itertools
 from glob import glob
 import os
 
@@ -54,6 +55,16 @@ def tree_to_simple_rsttree(tree, edu_num=1):
     # label: 'NNTextualorganization'
     nuc = tree.label()[:2]
     rel = tree.label()[2:]
+    # map to our coarse rel names
+    rel_map = {
+        'MannerMeans': 'manner-means',
+        'Sameunit': 'same-unit',
+        'TopicChange': 'topic-change',
+        'TopicComment': 'topic-comment',
+    }        
+    rel = rel_map.get(rel, rel)
+    # end map
+
     # same as in braud_coling
     edu_beg = (new_kids[0].num if isinstance(new_kids[0], EDU)
                else new_kids[0].label().edu_span[0])
@@ -116,5 +127,8 @@ def load_braud_eacl_dtrees(fpath, rel_conv, doc_names, nary_enc='chain'):
     for doc_name, ct_pred in ctree_pred.items():
         dt_pred = RstDepTree.from_rst_tree(ct_pred)
         dtree_pred[doc_name] = dt_pred
-    # TODO load ctrees, convert
+    # DEBUG
+    all_labels = set(itertools.chain.from_iterable(dt_pred.labels for dt_pred in dtree_pred.values()))
+    print(fpath, sorted(all_labels))
+    # end DEBUG
     return dtree_pred

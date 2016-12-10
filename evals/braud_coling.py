@@ -6,6 +6,7 @@ from __future__ import absolute_import, print_function
 
 import codecs
 from glob import glob
+import itertools
 import os
 
 from nltk import Tree
@@ -78,6 +79,10 @@ def tree_to_simple_rsttree(tree):
     new_kids = [tree_to_simple_rsttree(kid) for kid in tree]
     # node
     nuc, rel = tree.label().split('-', 1)
+    # map to our coarse rel names
+    if rel == 'Textual-organization':
+        rel = 'Textual'
+    # end map
     edu_beg = (new_kids[0].num if isinstance(new_kids[0], EDU)
                else new_kids[0].label().edu_span[0])
     edu_end = (new_kids[-1].num if isinstance(new_kids[-1], EDU)
@@ -145,5 +150,8 @@ def load_braud_coling_dtrees(out_dir, rel_conv, nary_enc='chain'):
         # print(dt_pred.labels)  # DEBUG
         # raise ValueError('debug me')
         dtree_pred[doc_name] = dt_pred
-    # TODO load ctrees, convert
+    # DEBUG
+    all_labels = set(itertools.chain.from_iterable(dt_pred.labels for dt_pred in dtree_pred.values()))
+    print(out_dir, sorted(all_labels))
+    # end DEBUG
     return dtree_pred

@@ -462,6 +462,12 @@ def main():
     report += '\n'
     # end table format and header line
 
+    # DEBUG
+    import itertools
+    all_labels = set(itertools.chain.from_iterable(dt_true.labels for dt_true in dtree_true.values()))
+    print("TRUE", sorted(all_labels))
+    # end DEBUG
+
     # * table content
     for parser_name, dtree_pred in d_preds:
         doc_names = sorted(dtree_true.keys())
