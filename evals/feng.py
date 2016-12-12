@@ -8,6 +8,8 @@ from __future__ import absolute_import, print_function
 
 import itertools
 
+from nltk import Tree
+
 from educe.rst_dt.feng import load_feng_output_files
 from educe.rst_dt.deptree import RstDepTree
 
@@ -42,6 +44,15 @@ def load_feng_ctrees(out_dir, rel_conv):
         # initial letter is capitalized whereas ours are not
         if rel_conv is not None:
             ct_pred = rel_conv(ct_pred)
+        # "normalize" names of classes of RST relations:
+        # "textual-organization" => "textual"
+        for pos in ct_pred.treepositions():
+            t = ct_pred[pos]
+            if isinstance(t, Tree):
+                node = t.label()
+                if node.rel == 'textual-organization':
+                    node.rel = 'textual'
+        # end normalize
         ctree_pred[doc_name] = ct_pred
 
     return ctree_pred
@@ -62,21 +73,12 @@ def load_feng_dtrees(out_dir, rel_conv, nary_enc='chain'):
     dtree_pred: dict(str, RstDepTree)
         RST dtree for each document.
     """
-    # load predicted trees
-    data_pred = load_feng_output_files(out_dir)
-    # filenames = data_pred['filenames']
-    doc_names_pred = data_pred['doc_names']
-    rst_ctrees_pred = data_pred['rst_ctrees']
+    # load predicted c-trees
+    ctree_pred = load_feng_ctrees(out_dir, rel_conv)
 
     # build a dict from doc_name to ordered dtree (RstDepTree)
     dtree_pred = dict()
-    for doc_name, ct_pred in itertools.izip(doc_names_pred, rst_ctrees_pred):
-        # constituency tree
-        # replace fine-grained labels with coarse-grained labels ;
-        # the files we have already contain the coarse labels, except their
-        # initial letter is capitalized whereas ours are not
-        if rel_conv is not None:
-            ct_pred = rel_conv(ct_pred)
+    for doc_name, ct_pred in ctree_pred.items():
         # convert to an ordered dependency tree ;
         # * 'tree' produces a weakly-ordered dtree strictly equivalent
         # to the original ctree,

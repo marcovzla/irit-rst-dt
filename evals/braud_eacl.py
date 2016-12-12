@@ -90,10 +90,12 @@ def _load_braud_eacl_file(f):
         sctrees.append(sctree)
     return sctrees
 
+
 def load_braud_eacl_file(fpath):
     """Load SimpleRSTTrees from a file"""
     with codecs.open(fpath, 'rb', 'utf-8') as f:
         return _load_braud_eacl_file(f)
+
 
 def load_braud_eacl_ctrees(fpath, rel_conv, doc_names):
     """Load the ctrees output by Braud et al.'s parser
@@ -127,8 +129,4 @@ def load_braud_eacl_dtrees(fpath, rel_conv, doc_names, nary_enc='chain'):
     for doc_name, ct_pred in ctree_pred.items():
         dt_pred = RstDepTree.from_rst_tree(ct_pred)
         dtree_pred[doc_name] = dt_pred
-    # DEBUG
-    all_labels = set(itertools.chain.from_iterable(dt_pred.labels for dt_pred in dtree_pred.values()))
-    print(fpath, sorted(all_labels))
-    # end DEBUG
     return dtree_pred

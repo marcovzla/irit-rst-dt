@@ -181,7 +181,17 @@ def load_gcrf_ctrees(out_dir, rel_conv):
         ct_pred = SimpleRSTTree.to_binary_rst_tree(sct_pred)
         if rel_conv is not None:
             ct_pred = rel_conv(ct_pred)
+        # "normalize" names of classes of RST relations:
+        # "textual-organization" => "textual"
+        for pos in ct_pred.treepositions():
+            t = ct_pred[pos]
+            if isinstance(t, Tree):
+                node = t.label()
+                if node.rel == 'textual-organization':
+                    node.rel = 'textual'
+        # end normalize
         ctree_pred[doc_name] = ct_pred
+
     return ctree_pred
 
 

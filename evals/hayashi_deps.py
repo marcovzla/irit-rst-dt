@@ -116,6 +116,11 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     for doc_name, dt_pred in dtrees.items():
         if rel_conv is not None:
             dt_pred = rel_conv(dt_pred)
+        # normalize names of classes of RST relations:
+        # "root" is "ROOT" in my coarse labelset (TODO: make it consistent)
+        dt_pred.labels = ['ROOT' if x == 'root' else x
+                          for x in dt_pred.labels]
+        # end normalize
         # WIP add nuclearity and rank
         edus_data = load_edu_input_file(edus_file_pat.format(doc_name),
                                         edu_type='rst-dt')

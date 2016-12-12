@@ -147,11 +147,5 @@ def load_braud_coling_dtrees(out_dir, rel_conv, nary_enc='chain'):
     ctree_pred = load_braud_coling_ctrees(out_dir, rel_conv)
     for doc_name, ct_pred in ctree_pred.items():
         dt_pred = RstDepTree.from_rst_tree(ct_pred)
-        # print(dt_pred.labels)  # DEBUG
-        # raise ValueError('debug me')
         dtree_pred[doc_name] = dt_pred
-    # DEBUG
-    all_labels = set(itertools.chain.from_iterable(dt_pred.labels for dt_pred in dtree_pred.values()))
-    print(out_dir, sorted(all_labels))
-    # end DEBUG
     return dtree_pred

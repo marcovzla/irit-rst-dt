@@ -7,6 +7,7 @@ from __future__ import print_function
 
 import argparse
 import codecs
+import itertools
 import os
 
 from educe.rst_dt.annotation import _binarize, SimpleRSTTree
@@ -41,7 +42,7 @@ from evals.ours import (load_deptrees_from_attelo_output,
 
 
 # RST corpus
-CORPUS_DIR = os.path.join('corpus', 'RSTtrees-WSJ-main-1.0/')
+CORPUS_DIR = os.path.join('corpus', 'RSTtrees-WSJ-main-1.01/')
 CD_TRAIN = os.path.join(CORPUS_DIR, 'TRAINING')
 CD_TEST = os.path.join(CORPUS_DIR, 'TEST')
 # relation converter (fine- to coarse-grained labels)
@@ -462,38 +463,27 @@ def main():
     report += '\n'
     # end table format and header line
 
-    # DEBUG
-    import itertools
-    all_labels = set(itertools.chain.from_iterable(dt_true.labels for dt_true in dtree_true.values()))
-    print("TRUE", sorted(all_labels))
-    # end DEBUG
-
     # * table content
+    # _true
+    doc_names = sorted(dtree_true.keys())
+    dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
+    labelset_true = set(itertools.chain.from_iterable(
+        x.labels for x in dtree_true_list))
+    labelset_true.add("span")  # RST-DT v.1.0 has an error in wsj_1189 7-9
+    # _pred
     for parser_name, dtree_pred in d_preds:
-        doc_names = sorted(dtree_true.keys())
-        dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
         dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
-        # WIP print per doc eval
-        if not os.path.exists(parser_name):
-            os.makedirs(parser_name)
-        for doc_name, dt_true, dt_pred in zip(
-                doc_names, dtree_true_list, dtree_pred_list):
-            with codecs.open(parser_name + '/' + doc_name + '.d_eval',
-                             mode='w', encoding='utf-8') as f:
-                print(', '.join('{:.4f}'.format(x)
-                                for x in compute_uas_las(
-                                        [dt_true], [dt_pred],
-                                        include_ls=INCLUDE_LS,
-                                        include_las_n_o_no=EVAL_NUC_RANK)),
-                      file=f)
-                if UNDIRECTED_DEPS:
-                    # scores for undirected edges
-                    print(', '.join('{:.4f}'.format(x)
-                                    for x in compute_uas_las_undirected(
-                                            [dt_true], [dt_pred])),
-                          file=f)
-        # end WIP print
-
+        # check that labelset_pred is a subset of labelset_true
+        labelset_pred = set(itertools.chain.from_iterable(
+            x.labels for x in dtree_pred_list))
+        try:
+            assert labelset_pred.issubset(labelset_true)
+        except AssertionError:
+            print(parser_name)
+            print('T - P', labelset_true - labelset_pred)
+            print('P - T', labelset_pred - labelset_true)
+            raise
+        # end check
         all_scores = []
         all_scores += list(compute_uas_las(
             dtree_true_list, dtree_pred_list, include_ls=INCLUDE_LS,
@@ -516,6 +506,7 @@ def main():
         doc_names = sorted(ctree_true.keys())
         ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
         ctree_pred_list = [ctree_pred[doc_name] for doc_name in doc_names]
+
         if simple_rsttree:
             ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
                                for x in ctree_true_list]
@@ -538,20 +529,7 @@ def main():
             with codecs.open(parser_name + '/' + doc_name, mode='w',
                              encoding='utf-8') as f:
                 print(ct, file=f)
-        # WIP eval each tree in turn
-        for doc_name, ct_true, ct_pred in zip(
-                doc_names, ctree_true_list, ctree_pred_list):
-            with codecs.open(parser_name + '/' + doc_name + '.c_eval',
-                             mode='w', encoding='utf-8') as f:
-                print(rst_parseval_report([ct_true], [ct_pred],
-                                          ctree_type=ctree_type,
-                                          digits=4,
-                                          per_doc=per_doc,
-                                          add_trivial_spans=eval_li_dep,
-                                          stringent=STRINGENT),
-                      file=f)
-        # end WIP
-        # FIXME
+
         # compute and print PARSEVAL scores
         print(parser_name)
         print(rst_parseval_report(ctree_true_list, ctree_pred_list,

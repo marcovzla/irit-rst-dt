@@ -114,7 +114,9 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
         # convert relation labels
         if rel_conv is not None:
             ct_pred = rel_conv(ct_pred)
-            # change "same_unit" (in Ji's output) into "same-unit" (in ours)
+            # normalize names of classes of RST relations:
+            # "same_unit" => "same-unit"
+            # "topic" => "topic-change" or "topic-comment"?
             for pos in ct_pred.treepositions():
                 t = ct_pred[pos]
                 if isinstance(t, RSTTree):
@@ -122,6 +124,13 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
                     # replace "same_unit" with "same-unit"
                     if node.rel == 'same_unit':
                         node.rel = 'same-unit'
+                    elif node.rel == 'topic':
+                        # either "topic-comment" or "topic-change" ;
+                        # I expect the parser to find "topic-comment" to
+                        # be easier but apparently it has no consequence
+                        # on the current output I reproduced
+                        node.rel = 'topic-comment'
+            # end normalize
         # store the resulting RSTTree
         ctree_pred[doc_name] = ct_pred
 
