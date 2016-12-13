@@ -122,13 +122,19 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
                 if isinstance(t, RSTTree):
                     node = t.label()
                     # replace "same_unit" with "same-unit"
-                    if node.rel == 'same_unit':
+                    if node.rel == 'same_unit':  # DPLP v. 1
                         node.rel = 'same-unit'
-                    elif node.rel == 'topic':
+                    elif node.rel == 'topic':  # DPLP v. 1
                         # either "topic-comment" or "topic-change" ;
                         # I expect the parser to find "topic-comment" to
                         # be easier but apparently it has no consequence
                         # on the current output I reproduced
+                        node.rel = 'topic-comment'
+                    elif node.rel == 'sameunit':  # Ji's output
+                        node.rel = 'same-unit'
+                    elif node.rel == 'topicchange':  # Ji's output
+                        node.rel = 'topic-change'
+                    elif node.rel == 'topiccomment':  # Ji's output
                         node.rel = 'topic-comment'
             # end normalize
         # store the resulting RSTTree

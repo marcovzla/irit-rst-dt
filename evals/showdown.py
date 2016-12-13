@@ -39,7 +39,7 @@ from evals.li_qi import load_li_qi_ctrees, load_li_qi_dtrees
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
                         load_attelo_dtrees)
-
+from evals.surdeanu import load_surdeanu_ctrees, load_surdeanu_dtrees
 
 # RST corpus
 CORPUS_DIR = os.path.join('corpus', 'RSTtrees-WSJ-main-1.01/')
@@ -104,7 +104,8 @@ EISNER_OUT_SYN_GOLD = os.path.join(
 # output of Joty's parser CODRA
 CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
 # output of Ji's parser DPLP
-JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
+# JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein', 'DPLP/data/docs/test/')
+JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein', 'official_output/outputs/')
 # Feng's parsers
 FENG_DIR = '/home/mmorey/melodi/rst/feng_hirst/'
 FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
@@ -119,6 +120,9 @@ HAYASHI_MST_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/dep/li')
 BRAUD_COLING_OUT_DIR = '/home/mmorey/melodi/rst/braud/coling16/pred_trees'
 BRAUD_EACL_MONO = '/home/mmorey/melodi/rst/braud/eacl16/best-en-mono/test_it8_beam16'
 BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/braud/eacl16/best-en-cross+dev/test_it10_beam32'
+# Surdeanu
+SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/surdeanu/output/log'
+
 
 # level of detail for parseval
 DETAILED = False
@@ -192,6 +196,7 @@ def main():
                                  'li_qi', 'hayashi_hilda', 'hayashi_mst',
                                  'braud_coling', 'braud_eacl_mono',
                                  'braud_eacl_cross_dev',
+                                 'surdeanu',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -204,6 +209,7 @@ def main():
                                  'li_qi', 'hayashi_hilda', 'hayashi_mst',
                                  'braud_coling', 'braud_eacl_mono',
                                  'braud_eacl_cross_dev',
+                                 'surdeanu',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -389,6 +395,16 @@ def main():
             # ji-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because codra outputs binary ctrees,
             # hence both encodings result in (the same) strictly ordered dtrees
+
+        if author_pred == 'surdeanu':
+            c_preds.append(
+                ('surdeanu', load_surdeanu_ctrees(
+                    SURDEANU_LOG_FILE, REL_CONV))
+            )
+            d_preds.append(
+                ('surdeanu', load_surdeanu_dtrees(
+                    SURDEANU_LOG_FILE, REL_CONV, nary_enc='chain'))
+            )
 
         if author_pred == 'ours_chain':
             # Eisner, predicted syntax, chain
