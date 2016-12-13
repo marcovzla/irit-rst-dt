@@ -36,6 +36,9 @@ from evals.hayashi_deps import (load_hayashi_dep_dtrees,
                                 load_hayashi_dep_ctrees)
 from evals.ji import load_ji_ctrees, load_ji_dtrees
 from evals.li_qi import load_li_qi_ctrees, load_li_qi_dtrees
+from evals.li_sujian import (DEFAULT_FILE as LI_SUJIAN_OUT_FILE,
+                             load_li_sujian_dep_ctrees,
+                             load_li_sujian_dep_dtrees)
 from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
                         load_attelo_dtrees)
@@ -122,7 +125,8 @@ BRAUD_EACL_MONO = '/home/mmorey/melodi/rst/braud/eacl16/best-en-mono/test_it8_be
 BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/braud/eacl16/best-en-cross+dev/test_it10_beam32'
 # Surdeanu
 SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/surdeanu/output/log'
-
+# Li Sujian dep parser
+# imported, see above
 
 # level of detail for parseval
 DETAILED = False
@@ -197,6 +201,7 @@ def main():
                                  'braud_coling', 'braud_eacl_mono',
                                  'braud_eacl_cross_dev',
                                  'surdeanu',
+                                 'li_sujian',
                                  'ours_chain', 'ours_tree', 'ours_tree_su'],
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
@@ -210,6 +215,7 @@ def main():
                                  'braud_coling', 'braud_eacl_mono',
                                  'braud_eacl_cross_dev',
                                  'surdeanu',
+                                 'li_sujian',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
     # * dtree eval
@@ -348,6 +354,18 @@ def main():
             d_preds.append(
                 ('li_qi', load_li_qi_dtrees(LI_QI_OUT_DIR, REL_CONV,
                                             nary_enc='chain'))
+            )
+
+        if author_pred == 'li_sujian':
+            c_preds.append(
+                ('li_sujian', load_li_sujian_dep_ctrees(
+                    LI_SUJIAN_OUT_FILE, REL_CONV_DTREE, EDUS_FILE_PAT,
+                    nuc_clf, rnk_clf))
+            )
+            d_preds.append(
+                ('li_sujian', load_li_sujian_dep_dtrees(
+                    LI_SUJIAN_OUT_FILE, REL_CONV_DTREE, EDUS_FILE_PAT,
+                    nuc_clf, rnk_clf))
             )
 
         if author_pred == 'feng':
