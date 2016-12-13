@@ -136,7 +136,8 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
 
 def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
                             rnk_clf):
-    """Load the dtrees output by one of Hayashi et al.'s dep parsers.
+    """Load the ctrees for the dtrees output by one of Hayashi et al.'s
+    dep parsers.
 
     Parameters
     ----------
