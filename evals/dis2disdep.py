@@ -12,16 +12,19 @@ import os
 
 from educe.corpus import FileId
 from educe.learning.disdep_format import dump_disdep_files
-from educe.rst_dt.codra import load_codra_output_files
 from educe.rst_dt.corpus import Reader, RstRelationConverter
 from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.feng import load_feng_output_files
 from educe.rst_dt.rst_wsj_corpus import (DOUBLE_FOLDER, TEST_FOLDER,
                                          TRAIN_FOLDER)
 
+from evals.codra import load_codra_output_files
 from evals.gcrf_tree_format import load_gcrf_dtrees
-from evals.hayashi_deps import load_hayashi_dtrees
+from evals.hayashi_cons import load_hayashi_hilda_dtrees
+from evals.hayashi_deps import load_hayashi_dep_dtrees
 from evals.ji import load_ji_dtrees
+from evals.showdown import (setup_dtree_postprocessor, NUC_STRATEGY,
+                            NUC_CONSTANT, RNK_STRATEGY, RNK_PRIORITY_SU)
 
 
 # original RST corpus
@@ -29,6 +32,11 @@ RST_CORPUS = os.path.join('/home/mmorey/corpora/rst_discourse_treebank/data')
 RST_MAIN_TRAIN = os.path.join(RST_CORPUS, TRAIN_FOLDER)
 RST_MAIN_TEST = os.path.join(RST_CORPUS, TEST_FOLDER)
 RST_DOUBLE = os.path.join(RST_CORPUS, DOUBLE_FOLDER)
+
+# get edu2sent, set up rnk_clf and nuc_clf to predict rank and order for
+# the output of Hayashi's MST parser
+# * new style .edu_input: one file per doc in test set
+EDUS_FILE_PAT = "TMP/latest/data/TEST/{}.relations.edu-pairs.sparse.edu_input"
 
 # relation converter (fine- to coarse-grained labels)
 RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
@@ -39,15 +47,18 @@ REL_CONV = REL_CONV_BASE.convert_tree
 REL_CONV_DTREE = REL_CONV_BASE.convert_dtree
 # output of Joty's parser
 OUT_JOTY = os.path.join('/home/mmorey/melodi/rst/joty/Doc-level/')
-# output of Feng & Hirst's parser
-OUT_FENG = os.path.join('/home/mmorey/melodi/rst/feng_hirst/phil/tmp/')
-# output of Feng & Hirst's parser
-OUT_FENG2 = os.path.join('/home/mmorey/melodi/rst/feng_hirst/gCRF_dist/texts/results/test_batch_gold_seg')
+# output of Feng & Hirst's parsers
+FENG_BASEDIR = '/home/mmorey/melodi/rst/feng_hirst'
+OUT_FENG = os.path.join(FENG_BASEDIR, 'phil/tmp/')
+OUT_FENG2 = os.path.join(FENG_BASEDIR,
+                         'gCRF_dist/texts/results/test_batch_gold_seg')
 # output of Ji's parser
-OUT_JI = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein/DPLP/data/docs/test/')
+JI_BASEDIR = '/home/mmorey/melodi/rst/ji_eisenstein'
+OUT_JI = os.path.join(JI_BASEDIR, 'DPLP/data/docs/test/')
 # output of Hayashi et al.'s parsers
-OUT_HAYASHI_MST = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/dep/li/')
-OUT_HAYASHI_HILDA = os.path.join('/home/mmorey/melodi/rst/hayashi/SIGDIAL/auto_parse/cons/trans_li/')
+HAYASHI_BASEDIR = '/home/mmorey/melodi/rst/hayashi/SIGDIAL/'
+OUT_HAYASHI_MST = os.path.join(HAYASHI_BASEDIR, 'auto_parse/dep/li/')
+OUT_HAYASHI_HILDA = os.path.join(HAYASHI_BASEDIR, 'auto_parse/cons/trans_li/')
 
 
 def main():
@@ -70,7 +81,8 @@ def main():
                         help="Root directory for the output")
     args = parser.parse_args()
     # precise output path, by default: TMP_disdep/chain/gold/train
-    out_dir = os.path.join(args.out_root, args.nary_enc, args.author, args.split)
+    out_dir = os.path.join(args.out_root, args.nary_enc, args.author,
+                           args.split)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     # read RST trees
@@ -139,13 +151,23 @@ def main():
         if corpus_split != 'test':
             raise ValueError("The output of Hayashi et al.'s parser is "
                              "available for the 'test' split only")
-        dtrees = load_hayashi_dtrees(OUT_HAYASHI_MST, REL_CONV_DTREE)
+        # setup nuc_clf, rnk_clf
+        nuc_clf, rnk_clf = setup_dtree_postprocessor(
+            nary_enc='tree', order='weak',
+            nuc_strategy=NUC_STRATEGY,
+            nuc_constant=NUC_CONSTANT,
+            rnk_strategy=RNK_STRATEGY,
+            rnk_prioritize_same_unit=RNK_PRIORITY_SU)
+        # end setup
+        dtrees = load_hayashi_dep_dtrees(
+            OUT_HAYASHI_MST, REL_CONV_DTREE, EDUS_FILE_PAT,
+            nuc_clf, rnk_clf)
     elif author == 'hayashi_hilda':
         if corpus_split != 'test':
             raise ValueError("The output of Hayashi et al.'s parser is "
                              "available for the 'test' split only")
-        dtrees = load_hayashi_dtrees(OUT_HAYASHI_HILDA, REL_CONV_DTREE)
-            
+        dtrees = load_hayashi_hilda_dtrees(OUT_HAYASHI_HILDA, REL_CONV)
+
     # do dump
     dump_disdep_files(dtrees.values(), out_dir)
 
