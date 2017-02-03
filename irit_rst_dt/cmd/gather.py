@@ -188,28 +188,30 @@ def main(args):
                          vocab_path=vocab_path,
                          label_path=label_path)
 
-    # frag pairs: supplementary pairs from/to each fragmented EDU to
-    # the other fragmented EDUs and the EDUs that don't belong to any
-    # fragmented EDU
-    instances = 'frag-pairs'
-    same_unit_types = set(('true' if isinstance(x, AttachOracle)
-                           else 'pred')
-                          for clf in same_unit_clfs)
-    for same_unit_type in sorted(same_unit_types):
-        # we use the vocabulary and labelset from "edu-pairs" ; this is the
-        # simplest solution currently and it seems correct, but maybe we
-        # could extend "edu-pairs" with these pairs when we learn the
-        # vocabulary?
-        if not args.skip_training:
-            extract_features(TRAINING_CORPUS, tdir_data, fix_pseudo_rels,
-                             instances, frag_edus=same_unit_type,
-                             vocab_path=vocab_path,
-                             label_path=label_path)
-        if TEST_CORPUS is not None:
-            extract_features(TEST_CORPUS, tdir_data, fix_pseudo_rels,
-                             instances, frag_edus=same_unit_type,
-                             vocab_path=vocab_path,
-                             label_path=label_path)
+    # WIP 2017-02-03 disable frag-pairs
+    if False:
+        # frag pairs: supplementary pairs from/to each fragmented EDU to
+        # the other fragmented EDUs and the EDUs that don't belong to any
+        # fragmented EDU
+        instances = 'frag-pairs'
+        same_unit_types = set(('true' if isinstance(x, AttachOracle)
+                               else 'pred')
+                              for clf in same_unit_clfs)
+        for same_unit_type in sorted(same_unit_types):
+            # we use the vocabulary and labelset from "edu-pairs" ;
+            # this is the simplest solution currently and it seems
+            # correct, but maybe we could extend "edu-pairs" with these
+            # pairs when we learn the vocabulary?
+            if not args.skip_training:
+                extract_features(TRAINING_CORPUS, tdir_data, fix_pseudo_rels,
+                                 instances, frag_edus=same_unit_type,
+                                 vocab_path=vocab_path,
+                                 label_path=label_path)
+            if TEST_CORPUS is not None:
+                extract_features(TEST_CORPUS, tdir_data, fix_pseudo_rels,
+                                 instances, frag_edus=same_unit_type,
+                                 vocab_path=vocab_path,
+                                 label_path=label_path)
     # end frag pairs        
 
     with open(os.path.join(tdir_data, "versions-gather.txt"), "w") as stream:
