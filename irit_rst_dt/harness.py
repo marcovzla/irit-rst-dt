@@ -108,22 +108,28 @@ class IritHarness(Harness):
     # paths
     # ------------------------------------------------------
 
-    def mpack_paths(self, test_data, stripped=False):
+    def mpack_paths(self, test_data, stripped=False, with_cdus=False):
         """
         Parameters
         ----------
-        test_data: boolean
+        test_data : boolean
             If true, the returned paths point to self.testset else to
             self.dataset.
-        stripped: boolean
+
+        stripped : boolean, defaults to False
             TODO
+
+        with_cdus : boolean, defaults to False
+            If True, generate CDUs (eg. for fragmented EDUs), pairings
+            on them and the corresponding feature vectors.
 
         Returns
         -------
-        paths: dict of file paths
-            Path to: edu_input, pairings, features, vocab, labels,
-            cdu_input, cdu_pairings, cdu_features, corpus (to access
-            gold structures, WIP).
+        paths : dict of (glob patterns of) file paths
+            Path to: edu_input, pairings, features, vocab, labels.
+            Also contains 'corpus' (to access gold structures, WIP for
+            RST-DT) ; if `with_cdus` is True, also cdu_input,
+            cdu_pairings, cdu_features.
         """
         base = 'relations.edu-pairs'
         ext = base + '.sparse'
