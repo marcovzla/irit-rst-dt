@@ -155,9 +155,9 @@ class IritHarness(Harness):
             'labels': labels_path,
             # fragmented EDUs
             'cdu_input': (frag_path + '.cdu_input' if with_cdus
-                          else None)
+                          else None),
             'cdu_pairings': (frag_path + '.cdu_pairings' if with_cdus
-                             else None)
+                             else None),
             'cdu_features': (((frag_path + '.stripped') if stripped
                               else frag_path) if with_cdus
                              else None),
