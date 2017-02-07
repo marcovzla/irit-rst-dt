@@ -138,9 +138,10 @@ class IritHarness(Harness):
         vocab_path = fp.join(self.eval_dir, "%s.%s.vocab" % (dset, ext))
         labels_path = fp.join(self.eval_dir, "%s.%s.labels" % (dset, base))
         core_path = fp.join(self.eval_dir, dset, "*.%s" % ext)
-        # 2016-07-28 pairs on fragmented EDUs
-        frag_ext = 'relations.frag-pairs.sparse'
-        frag_path = fp.join(self.eval_dir, dset, "*.%s" % frag_ext)
+        if with_cdus:
+            # 2016-07-28 pairs on fragmented EDUs
+            frag_ext = 'relations.frag-pairs.sparse'
+            frag_path = fp.join(self.eval_dir, dset, "*.%s" % frag_ext)
         # WIP gold RST trees
         corpus_path = fp.abspath(TEST_CORPUS if test_data
                                  else TRAINING_CORPUS)
@@ -153,10 +154,13 @@ class IritHarness(Harness):
             'vocab': vocab_path,
             'labels': labels_path,
             # fragmented EDUs
-            'cdu_input': frag_path + '.cdu_input',
-            'cdu_pairings': frag_path + '.cdu_pairings',
-            'cdu_features': ((frag_path + '.stripped') if stripped
-                             else frag_path),
+            'cdu_input': (frag_path + '.cdu_input' if with_cdus
+                          else None)
+            'cdu_pairings': (frag_path + '.cdu_pairings' if with_cdus
+                             else None)
+            'cdu_features': (((frag_path + '.stripped') if stripped
+                              else frag_path) if with_cdus
+                             else None),
             # corpus for gold RST trees
             'corpus': corpus_path,
         }
