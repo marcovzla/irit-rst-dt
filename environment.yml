@@ -1,6 +1,7 @@
 name: irit-rst-dt
 dependencies:
   - python=2.7
+  - graphviz=2.38.0
   - nltk
   - scikit-learn
   - pip:
