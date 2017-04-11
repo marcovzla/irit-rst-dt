@@ -108,6 +108,7 @@ class IritHarness(Harness):
     # paths
     # ------------------------------------------------------
 
+<<<<<<< HEAD
     def mpack_paths(self, test_data, stripped=False, with_cdus=False):
         """
         Parameters
@@ -130,6 +131,26 @@ class IritHarness(Harness):
             Also contains 'corpus' (to access gold structures, WIP for
             RST-DT) ; if `with_cdus` is True, also cdu_input,
             cdu_pairings, cdu_features.
+=======
+    def mpack_paths(self, test_data, stripped=False):
+        """Return a dict of paths needed to read a datapack.
+
+        Parameters
+        ----------
+        test_data : boolean
+            If True, it's the test set we wanted, else the dataset.
+
+        stripped : boolean, defaults to False
+            If True, return path for a "stripped" version of the data
+            (faster loading, but only useful for scoring).
+
+        Returns
+        -------
+        res : dict
+            Paths to files that enable to read a datapack.
+            Useful keys are 'edu_input', 'pairings', 'features', 'vocab',
+            'corpus' (WIP, used to access gold structures).
+>>>>>>> upstream/master
         """
         base = 'relations.edu-pairs'
         ext = base + '.sparse'
@@ -141,6 +162,7 @@ class IritHarness(Harness):
         # WIP gold RST trees
         corpus_path = fp.abspath(TEST_CORPUS if test_data
                                  else TRAINING_CORPUS)
+<<<<<<< HEAD
         # end gold RST trees
         res = {
             'edu_input': core_path + '.edu_input',
@@ -167,6 +189,16 @@ class IritHarness(Harness):
             ])
 
         return res
+=======
+        # end WIP
+        return {
+            'edu_input': core_path + '.edu_input',
+            'pairings': core_path + '.pairings',
+            'features': (core_path + '.stripped') if stripped else core_path,
+            'vocab': core_path + '.vocab',
+            'corpus': corpus_path
+        }
+>>>>>>> upstream/master
 
     def model_paths(self, rconf, fold, parser):
         """Paths to the learner(s) model(s).
