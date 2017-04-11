@@ -17,6 +17,7 @@ from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
                                   InsideOutAttachmentRanker)
 from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
+                                               rst_parseval_compact_report,
                                                rst_parseval_report)
 #
 from attelo.metrics.deptree import (compute_uas_las,
@@ -131,7 +132,6 @@ SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/replication/surdeanu/output/log'
 # imported, see above
 
 # level of detail for parseval
-DETAILED = False
 STRINGENT = False
 # additional dependency metrics
 INCLUDE_LS = False
@@ -239,6 +239,8 @@ def main():
     # * display options
     parser.add_argument('--digits', type=int, default=3,
                         help='Precision (number of digits) of scores')
+    parser.add_argument('--detailed', type=int, default=0,
+                        help='Level of detail for evaluations')
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -249,6 +251,8 @@ def main():
     simple_rsttree = args.simple_rsttree
     # display
     digits = args.digits
+    # level of detail for evals
+    detailed = args.detailed
 
     # "per_doc = True" computes p, r, f as in DPLP: compute scores per doc
     # then average over docs
@@ -470,14 +474,14 @@ def main():
             load_deptrees_from_attelo_output(ctree_true, dtree_true,
                                              EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
                                              nuc_clf, rnk_clf,
-                                             detailed=False)
+                                             detailed=(detailed >= 3))
             print('======================')
 
             print('Eisner, gold syntax')
             load_deptrees_from_attelo_output(ctree_true, dtree_true,
                                              EISNER_OUT_SYN_GOLD, EDUS_FILE,
                                              nuc_clf, rnk_clf,
-                                             detailed=False)
+                                             detailed=(detailed >= 3))
             print('======================')
 
     # dependency eval
@@ -542,47 +546,70 @@ def main():
     # end report
 
     # constituency eval
-    for parser_name, ctree_pred in c_preds:
-        doc_names = sorted(ctree_true.keys())
-        ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
-        ctree_pred_list = [ctree_pred[doc_name] for doc_name in doc_names]
+    ctree_type = 'SimpleRST' if simple_rsttree else 'RST'
 
-        if simple_rsttree:
-            ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
-                               for x in ctree_true_list]
-            ctree_pred_list = [SimpleRSTTree.from_rst_tree(x)
-                               for x in ctree_pred_list]
-            ctree_type = 'SimpleRST'
-        else:
-            ctree_type = 'RST'
+    doc_names = sorted(ctree_true.keys())
+    ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
+    if simple_rsttree:
+        ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
+                           for x in ctree_true_list]
+    # WIP print SimpleRSTTrees
+    if not os.path.exists('gold'):
+        os.makedirs('gold')
+    for doc_name, ct in zip(doc_names, ctree_true_list):
+        with codecs.open('gold/' + ct.origin.doc, mode='w',
+                         encoding='utf-8') as f:
+            print(ct, file=f)
 
-        # WIP print SimpleRSTTrees
-        if not os.path.exists('gold'):
-            os.makedirs('gold')
-        for doc_name, ct in zip(doc_names, ctree_true_list):
-            with codecs.open('gold/' + ct.origin.doc, mode='w',
-                             encoding='utf-8') as f:
-                print(ct, file=f)
-        if not os.path.exists(parser_name):
-            os.makedirs(parser_name)
-        for doc_name, ct in zip(doc_names, ctree_pred_list):
-            with codecs.open(parser_name + '/' + doc_name, mode='w',
-                             encoding='utf-8') as f:
-                print(ct, file=f)
+    # sort the predictions of each parser, so they match the order of
+    # documents and reference trees in _true
+    ctree_preds = [(parser_name,
+                    [ctree_pred[doc_name] for doc_name in doc_names])
+                   for parser_name, ctree_pred in c_preds]
+    if simple_rsttree:
+        ctree_preds = [(parser_name,
+                        [SimpleRSTTree.from_rst_tree(x)
+                         for x in ctree_pred_list])
+                       for parser_name, ctree_pred_list in ctree_preds]
+    # generate report
+    if detailed == 0:
+        # compact report, f1-scores only
+        print(rst_parseval_compact_report(ctree_true_list, ctree_preds,
+                                          ctree_type=ctree_type,
+                                          metric_types=['S', 'N', 'R', 'F'],
+                                          digits=digits,
+                                          per_doc=per_doc,
+                                          add_trivial_spans=eval_li_dep,
+                                          stringent=STRINGENT))
+    else:
+        # standard reports: 1 table per parser, 1 line per metric,
+        # cols = [p, r, f1, support_true, support_pred]
+        for parser_name, ctree_pred_list in ctree_preds:
+            # WIP print SimpleRSTTrees
+            if not os.path.exists(parser_name):
+                os.makedirs(parser_name)
+            for doc_name, ct in zip(doc_names, ctree_pred_list):
+                with codecs.open(parser_name + '/' + doc_name, mode='w',
+                                 encoding='utf-8') as f:
+                    print(ct, file=f)
 
-        # compute and print PARSEVAL scores
-        print(parser_name)
-        print(rst_parseval_report(ctree_true_list, ctree_pred_list,
-                                  ctree_type=ctree_type, digits=digits,
-                                  per_doc=per_doc,
-                                  add_trivial_spans=eval_li_dep,
-                                  stringent=STRINGENT))
-        # detailed report on R
-        if DETAILED:
-            print(rst_parseval_detailed_report(
-                ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
-                metric_type='R'))
-        # end FIXME
+            # compute and print PARSEVAL scores
+            print(parser_name)
+            # metric_types=None includes the variants with head:
+            # S+H, N+H, R+H, F+H
+            print(rst_parseval_report(ctree_true_list, ctree_pred_list,
+                                      ctree_type=ctree_type,
+                                      metric_types=None,
+                                      digits=digits,
+                                      per_doc=per_doc,
+                                      add_trivial_spans=eval_li_dep,
+                                      stringent=STRINGENT))
+            # detailed report on R
+            if detailed >= 2:
+                print(rst_parseval_detailed_report(
+                    ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
+                    metric_type='R'))
+            # end FIXME
 
 
 if __name__ == '__main__':
