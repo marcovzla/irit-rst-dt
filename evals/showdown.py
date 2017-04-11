@@ -236,6 +236,9 @@ def main():
                         help=("Evaluate as in the dep parser of Li et al. "
                               "2014: all relations are NS, spiders map to "
                               "left-heavy branching, three trivial spans "))
+    # * display options
+    parser.add_argument('--digits', type=int, default=3,
+                        help='Precision (number of digits) of scores')
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -244,6 +247,8 @@ def main():
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
     simple_rsttree = args.simple_rsttree
+    # display
+    digits = args.digits
 
     # "per_doc = True" computes p, r, f as in DPLP: compute scores per doc
     # then average over docs
@@ -479,7 +484,6 @@ def main():
 
     # report
     # * table format
-    digits = 4
     width = max(len(parser_name) for parser_name, _ in d_preds)
 
     headers = ["UAS", "LAS"]
@@ -569,15 +573,15 @@ def main():
         # compute and print PARSEVAL scores
         print(parser_name)
         print(rst_parseval_report(ctree_true_list, ctree_pred_list,
-                                  ctree_type=ctree_type, digits=4,
+                                  ctree_type=ctree_type, digits=digits,
                                   per_doc=per_doc,
                                   add_trivial_spans=eval_li_dep,
                                   stringent=STRINGENT))
-        # detailed report on S+N+R
+        # detailed report on R
         if DETAILED:
             print(rst_parseval_detailed_report(
                 ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
-                metric_type='S+R'))
+                metric_type='R'))
         # end FIXME
 
 
