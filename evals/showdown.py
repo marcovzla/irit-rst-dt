@@ -63,29 +63,31 @@ REL_CONV_DTREE = REL_CONV_BASE.convert_dtree
 
 # * syntax: pred vs gold
 # old-style .edu_input: whole test set
-EDUS_FILE = os.path.join('/home/mmorey/melodi',
+EDUS_FILE = os.path.join('/home/mmorey/melodi/rst',
                          'irit-rst-dt/TMP/syn_gold_coarse',
                          'TEST.relations.sparse.edu_input')
 
 # new style .edu_input: one file per doc in test set
-EDUS_FILE_PAT = "TMP/latest/data/TEST/{}.relations.edu-pairs.sparse.edu_input"
+# was: TMP/latest/data..., replaced latest with 2016-09-30T1701 but
+# might be wrong (or it might have no consequence here)
+EDUS_FILE_PAT = "TMP/2016-09-30T1701/data/TEST/{}.relations.edu-pairs.sparse.edu_input"
 
 # outputs of parsers
 EISNER_OUT_SYN_PRED = os.path.join(
-    '/home/mmorey/melodi',
+    '/home/mmorey/melodi/rst',
     'irit-rst-dt/TMP/syn_pred_coarse',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 # 2016-09-14 "tree" transform, predicted syntax
 EISNER_OUT_TREE_SYN_PRED = os.path.join(
-    '/home/mmorey/melodi',
+    '/home/mmorey/melodi/rst',
     'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
-    '/home/mmorey/melodi',
+    '/home/mmorey/melodi/rst',
     'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt_su-eisner')
@@ -93,38 +95,38 @@ EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
 
 
 EISNER_OUT_SYN_PRED_SU = os.path.join(
-    '/home/mmorey/melodi',
+    '/home/mmorey/melodi/rst',
     'irit-rst-dt/TMP/latest',  # lbl
     'scratch-current/combined',
     'output.maxent-AD.L-jnt_su-eisner')
 
 EISNER_OUT_SYN_GOLD = os.path.join(
-    '/home/mmorey/melodi',
+    '/home/mmorey/melodi/rst',
     'irit-rst-dt/TMP/syn_gold_coarse',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 # output of Joty's parser CODRA
-CODRA_OUT_DIR = '/home/mmorey/melodi/rst/joty/Doc-level'
+CODRA_OUT_DIR = '/home/mmorey/melodi/rst/replication/joty/Doc-level'
 # output of Ji's parser DPLP
-# JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein', 'DPLP/data/docs/test/')
-JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/ji_eisenstein', 'official_output/outputs/')
+# JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/replication/ji_eisenstein', 'DPLP/data/docs/test/')
+JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/replication/ji_eisenstein', 'official_output/outputs/')
 # Feng's parsers
-FENG_DIR = '/home/mmorey/melodi/rst/feng_hirst/'
+FENG_DIR = '/home/mmorey/melodi/rst/replication/feng_hirst/'
 FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
 FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_seg')
 # Li Qi's parser
-LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/li_qi/result'
+LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/replication/li_qi/result'
 # Hayashi's HILDA
-HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/hayashi/SIGDIAL'
+HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/replication/hayashi/SIGDIAL'
 HAYASHI_HILDA_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/cons/HILDA')
 HAYASHI_MST_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/dep/li')
 # Braud
-BRAUD_COLING_OUT_DIR = '/home/mmorey/melodi/rst/braud/coling16/pred_trees'
-BRAUD_EACL_MONO = '/home/mmorey/melodi/rst/braud/eacl16/best-en-mono/test_it8_beam16'
-BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/braud/eacl16/best-en-cross+dev/test_it10_beam32'
+BRAUD_COLING_OUT_DIR = '/home/mmorey/melodi/rst/replication/braud/coling16/pred_trees'
+BRAUD_EACL_MONO = '/home/mmorey/melodi/rst/replication/braud/eacl16/best-en-mono/test_it8_beam16'
+BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/replication/braud/eacl16/best-en-cross+dev/test_it10_beam32'
 # Surdeanu
-SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/surdeanu/output/log'
+SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/replication/surdeanu/output/log'
 # Li Sujian dep parser
 # imported, see above
 

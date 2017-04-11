@@ -15,7 +15,7 @@ from attelo.metrics.deptree import compute_uas_las as att_compute_uas_las
 
 
 # output of Li et al.'s parser
-SAVE_DIR = "/home/mmorey/melodi/rst/li_sujian/TextLevelDiscourseParser/mybackup/mstparser-code-116-trunk/mstparser/save"
+SAVE_DIR = "/home/mmorey/melodi/rst/replication/li_sujian/TextLevelDiscourseParser/mybackup/mstparser-code-116-trunk/mstparser/save"
 COARSE_FILES = [
     "136.0detailedOutVersion2.txt",
     "151.0detailedOut.txt",
