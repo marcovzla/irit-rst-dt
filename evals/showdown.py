@@ -49,6 +49,7 @@ from evals.surdeanu import load_surdeanu_ctrees, load_surdeanu_dtrees
 CORPUS_DIR = os.path.join('corpus', 'RSTtrees-WSJ-main-1.01/')
 CD_TRAIN = os.path.join(CORPUS_DIR, 'TRAINING')
 CD_TEST = os.path.join(CORPUS_DIR, 'TEST')
+DOUBLE_DIR = os.path.join('corpus', 'RSTtrees-WSJ-double-1.0')
 # relation converter (fine- to coarse-grained labels)
 RELMAP_FILE = os.path.join('/home/mmorey/melodi/educe',
                            'educe', 'rst_dt',
@@ -299,11 +300,12 @@ def main():
         dtree_true[doc_name] = dt_true
     # sorted doc_names, because braud_eacl put all predictions in one file
     sorted_doc_names = sorted(dtree_true.keys())
-    
+
     c_preds = []  # predictions: [(parser_name, dict(doc_name, ct_pred))]
     d_preds = []  # predictions: [(parser_name, dict(doc_name, dt_pred))]
 
     for author_pred in authors_pred:
+        # braud coling 2016
         if author_pred == 'braud_coling':
             c_preds.append(
                 ('braud_coling', load_braud_coling_ctrees(
@@ -312,8 +314,8 @@ def main():
             d_preds.append(
                 ('braud_coling', load_braud_coling_dtrees(
                     BRAUD_COLING_OUT_DIR, REL_CONV, nary_enc='chain'))
-            )            
-
+            )
+        # braud eacl 2017 - mono
         if author_pred == 'braud_eacl_mono':
             c_preds.append(
                 ('braud_eacl_mono', load_braud_eacl_ctrees(
@@ -323,8 +325,8 @@ def main():
                 ('braud_eacl_mono', load_braud_eacl_dtrees(
                     BRAUD_EACL_MONO, REL_CONV, sorted_doc_names,
                     nary_enc='chain'))
-            )            
-
+            )
+        # braud eacl 2017 - cross+dev
         if author_pred == 'braud_eacl_cross_dev':
             c_preds.append(
                 ('braud_eacl_cross_dev', load_braud_eacl_ctrees(
@@ -334,7 +336,7 @@ def main():
                 ('braud_eacl_cross_dev', load_braud_eacl_dtrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names,
                     nary_enc='chain'))
-            )            
+            )
 
         if author_pred == 'hayashi_hilda':
             c_preds.append(
@@ -473,15 +475,13 @@ def main():
             print('Eisner, predicted syntax + same-unit')
             load_deptrees_from_attelo_output(ctree_true, dtree_true,
                                              EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
-                                             nuc_clf, rnk_clf,
-                                             detailed=(detailed >= 3))
+                                             nuc_clf, rnk_clf)
             print('======================')
 
             print('Eisner, gold syntax')
             load_deptrees_from_attelo_output(ctree_true, dtree_true,
                                              EISNER_OUT_SYN_GOLD, EDUS_FILE,
-                                             nuc_clf, rnk_clf,
-                                             detailed=(detailed >= 3))
+                                             nuc_clf, rnk_clf)
             print('======================')
 
     # dependency eval
@@ -610,6 +610,76 @@ def main():
                     ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
                     metric_type='R'))
             # end FIXME
+
+    # 2017-04-11 compute agreement between human annotators, on DOUBLE
+    if 'silver' in authors_pred:
+        # read the annotation we'll consider as "silver"
+        reader_dbl = RstReader(DOUBLE_DIR)
+        corpus_dbl_pred = {k.doc: v for k, v in reader_dbl.slurp().items()}
+        docs_dbl = sorted(k for k in corpus_dbl_pred.keys())
+        # collect the "true" annotation for the docs in double, from train
+        # and test
+        # (test has already been read at the beginning of this script)
+        corpus_test_dbl = {k.doc: v for k, v in corpus_test.items()
+                           if k.doc in docs_dbl}
+        # read the docs from train that are in double
+        reader_train = RstReader(CD_TRAIN)
+        corpus_train = reader_train.slurp()
+        corpus_train_dbl = {k.doc: v for k, v in corpus_train.items()
+                            if k.doc in docs_dbl}
+        # assemble the "true" version of the double subset
+        corpus_dbl_true = dict(corpus_test_dbl.items() +
+                               corpus_train_dbl.items())
+        assert (sorted(corpus_dbl_true.keys()) ==
+                sorted(corpus_dbl_pred.keys()))
+        # extra check?
+        for doc_name in docs_dbl:
+            leaf_spans_true = [x.text_span() for x
+                               in corpus_dbl_true[doc_name].leaves()]
+            leaf_spans_pred = [x.text_span() for x
+                               in corpus_dbl_pred[doc_name].leaves()]
+            if (leaf_spans_true != leaf_spans_pred):
+                print(doc_name, 'EEEE')
+                print('true - pred',
+                      set(leaf_spans_true) - set(leaf_spans_pred))
+                print('pred - true',
+                      set(leaf_spans_pred) - set(leaf_spans_true))
+            else:
+                print(doc_name, 'ok')
+        # end extra check
+
+        # 48 docs in train,
+        # 5 docs in test: ['wsj_0627.out', 'wsj_0684.out', 'wsj_1129.out',
+        # 'wsj_1365.out', 'wsj_1387.out']
+        # create parallel lists of ctrees for _true and _pred, mapped to
+        # coarse rels and binarized
+        # _pred:
+        ctree_dbl_pred = [corpus_dbl_pred[doc_name] for doc_name in docs_dbl]
+        ctree_dbl_pred = [REL_CONV(x) for x in ctree_dbl_pred]
+        if binarize_true:  # maybe not?
+            ctree_dbl_pred = [_binarize(x) for x in ctree_dbl_pred]
+        if simple_rsttree:
+            ctree_dbl_pred = [SimpleRSTTree.from_rst_tree(x)
+                              for x in ctree_dbl_pred]
+        # _true:
+        ctree_dbl_true = [corpus_dbl_true[doc_name] for doc_name in docs_dbl]
+        ctree_dbl_true = [REL_CONV(x) for x in ctree_dbl_true]
+        if binarize_true:
+            ctree_dbl_true = [_binarize(x) for x in ctree_dbl_true]
+        if simple_rsttree:
+            ctree_dbl_true = [SimpleRSTTree.from_rst_tree(x)
+                              for x in ctree_dbl_true]
+        # generate report
+        ctree_dbl_preds = [('silver', ctree_dbl_pred)]
+        print(rst_parseval_compact_report(ctree_dbl_true, ctree_dbl_preds,
+                                          ctree_type=ctree_type,
+                                          span_type='chars',
+                                          metric_types=['S', 'N', 'R', 'F'],
+                                          digits=digits,
+                                          per_doc=per_doc,
+                                          add_trivial_spans=eval_li_dep,
+                                          stringent=STRINGENT))
+    # end 2017-04-11 agreement between human annotators
 
 
 if __name__ == '__main__':
