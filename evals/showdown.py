@@ -633,19 +633,20 @@ def main():
         assert (sorted(corpus_dbl_true.keys()) ==
                 sorted(corpus_dbl_pred.keys()))
         # extra check?
-        for doc_name in docs_dbl:
-            leaf_spans_true = [x.text_span() for x
-                               in corpus_dbl_true[doc_name].leaves()]
-            leaf_spans_pred = [x.text_span() for x
-                               in corpus_dbl_pred[doc_name].leaves()]
-            if (leaf_spans_true != leaf_spans_pred):
-                print(doc_name, 'EEEE')
-                print('true - pred',
-                      set(leaf_spans_true) - set(leaf_spans_pred))
-                print('pred - true',
-                      set(leaf_spans_pred) - set(leaf_spans_true))
-            else:
-                print(doc_name, 'ok')
+        if False:
+            for doc_name in docs_dbl:
+                leaf_spans_true = [x.text_span() for x
+                                   in corpus_dbl_true[doc_name].leaves()]
+                leaf_spans_pred = [x.text_span() for x
+                                   in corpus_dbl_pred[doc_name].leaves()]
+                if (leaf_spans_true != leaf_spans_pred):
+                    print(doc_name, 'EEEE')
+                    print('true - pred',
+                          set(leaf_spans_true) - set(leaf_spans_pred))
+                    print('pred - true',
+                          set(leaf_spans_pred) - set(leaf_spans_true))
+                else:
+                    print(doc_name, 'ok')
         # end extra check
 
         # 48 docs in train,
