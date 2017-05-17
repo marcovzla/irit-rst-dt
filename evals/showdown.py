@@ -609,7 +609,7 @@ def main():
     # generate report
     if detailed == 0:
         # compact report, f1-scores only
-        print(rst_parseval_compact_report(ctree_true_list, ctree_preds,
+        print(rst_parseval_compact_report(author_true, ctree_preds,
                                           ctree_type=ctree_type,
                                           metric_types=['S', 'N', 'R', 'F'],
                                           digits=digits,
@@ -715,8 +715,9 @@ def main():
             ctree_dbl_true = [SimpleRSTTree.from_rst_tree(x)
                               for x in ctree_dbl_true]
         # generate report
-        ctree_dbl_preds = [('silver', ctree_dbl_pred)]
-        print(rst_parseval_compact_report(ctree_dbl_true, ctree_dbl_preds,
+        ctree_dbl_preds = [('silver', ctree_dbl_pred),
+                           ('gold', ctree_dbl_true)]
+        print(rst_parseval_compact_report(author_true, ctree_dbl_preds,
                                           ctree_type=ctree_type,
                                           span_type='chars',
                                           metric_types=['S', 'N', 'R', 'F'],
