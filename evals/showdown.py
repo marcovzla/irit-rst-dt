@@ -212,7 +212,8 @@ def main():
                         help="Encoding of n-ary nodes for the predictions")
     # reference
     parser.add_argument('--author_true', default='gold',
-                        choices=['gold', 'silver',
+                        choices=['each',  # NEW generate sim matrix
+                                 'gold', 'silver',
                                  'joty', 'feng', 'feng2', 'ji',
                                  'li_qi', 'hayashi_hilda', 'hayashi_mst',
                                  'braud_coling', 'braud_eacl_mono',
@@ -221,13 +222,13 @@ def main():
                                  'li_sujian',
                                  'ours_chain', 'ours_tree'],
                         help="Author of the reference")
-    # * dtree eval
-    parser.add_argument('--nary_enc_true', default='tree',
-                        choices=['tree', 'chain'],
-                        help="Encoding of n-ary nodes for the reference")
-    # * ctree eval
-    parser.add_argument('--binarize_true', action='store_true',
-                        help="Binarize the reference ctree for the eval")
+    # * ctree/dtree eval: the value of binarize_true determines the values
+    # of nary_enc_true and order_true (the latter is yet unused)
+    parser.add_argument('--binarize_true', default='none',
+                        choices=['none', 'right', 'right_mixed', 'left'],
+                        help=("Binarization method for the reference ctree"
+                              "in the eval ; defaults to 'none' for no "
+                              "binarization"))
     parser.add_argument('--simple_rsttree', action='store_true',
                         help="Binarize ctree and move relations up")
     # * non-standard evals
@@ -240,18 +241,23 @@ def main():
     # * display options
     parser.add_argument('--digits', type=int, default=3,
                         help='Precision (number of digits) of scores')
+    parser.add_argument('--percent', action='store_true',
+                        help='Scores are displayed as percentages (ex: 57.9)')
     parser.add_argument('--detailed', type=int, default=0,
                         help='Level of detail for evaluations')
     #
     args = parser.parse_args()
     author_true = args.author_true
-    nary_enc_true = args.nary_enc_true
     authors_pred = args.authors_pred
     nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
     simple_rsttree = args.simple_rsttree
     # display
     digits = args.digits
+    percent = args.percent
+    if percent:
+        if digits < 3:
+            raise ValueError('--percent requires --digits >= 3')
     # level of detail for evals
     detailed = args.detailed
 
@@ -264,10 +270,15 @@ def main():
     # three trivial spans
     eval_li_dep = args.eval_li_dep
 
-    #
-    if binarize_true and nary_enc_true != 'chain':
-        raise ValueError("--binarize_true is compatible with "
-                         "--nary_enc_true chain only")
+    if binarize_true in ('right', 'right_mixed'):
+        nary_enc_true = 'chain'
+        order_true = 'strict'
+    elif binarize_true == 'left':
+        nary_enc_true = 'tree'
+        order_true = 'strict'
+    else:  # 'none' for no binarization of the reference tree
+        nary_enc_true = 'tree'
+        order_true = 'weak'
 
     # 0. setup the postprocessors to flesh out unordered dtrees into ordered
     # ones with nuclearity
@@ -291,9 +302,9 @@ def main():
         doc_name = doc_id.doc
         # original reference ctree, with coarse labels
         ct_true = REL_CONV(ct_true)  # map fine to coarse relations
-        if binarize_true:
+        if binarize_true != "none":
             # binarize ctree if required
-            ct_true = _binarize(ct_true)
+            ct_true = _binarize(ct_true, branching=binarize_true)
         ctree_true[doc_name] = ct_true
         # corresponding dtree
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc_true)
@@ -485,16 +496,18 @@ def main():
             print('======================')
 
     # dependency eval
-
+    dep_metrics = ["U"]
+    if EVAL_NUC_RANK:
+        dep_metrics += ['O', 'N']
+    dep_metrics += ["R"]
+    if INCLUDE_LS:
+        dep_metrics += ["tag_R"]
+    if EVAL_NUC_RANK:
+        dep_metrics += ["R+N", "R+O", "F"]
     # report
     # * table format
     width = max(len(parser_name) for parser_name, _ in d_preds)
-
-    headers = ["UAS", "LAS"]
-    if INCLUDE_LS:
-        headers += ["LS"]
-    if EVAL_NUC_RANK:
-        headers += ["LAS+N", "LAS+O", "LAS+N+O"]
+    headers = dep_metrics
     if UNDIRECTED_DEPS:
         headers += ["UUAS", "ULAS"]
     fmt = '%% %ds' % width  # first col: parser name
@@ -505,6 +518,8 @@ def main():
     headers = [""] + headers
     report = fmt % tuple(headers)
     report += '\n'
+    # display percentages
+    dep_digits = digits - 2 if percent else digits
     # end table format and header line
 
     # * table content
@@ -530,8 +545,8 @@ def main():
         # end check
         all_scores = []
         all_scores += list(compute_uas_las(
-            dtree_true_list, dtree_pred_list, include_ls=INCLUDE_LS,
-            include_las_n_o_no=EVAL_NUC_RANK))
+            dtree_true_list, dtree_pred_list, metrics=dep_metrics,
+            doc_names=doc_names))
         if UNDIRECTED_DEPS:
             score_uuas, score_ulas = compute_uas_las_undirected(
                 dtree_true_list, dtree_pred_list)
@@ -539,7 +554,9 @@ def main():
         # append to report
         values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
         for v in all_scores:
-            values += ["{0:0.{1}f}".format(v, digits)]
+            if percent:
+                v = v * 100.0
+            values += ["{0:0.{1}f}".format(v, dep_digits)]
         report += fmt % tuple(values)
     # end table content
     print(report)
@@ -578,6 +595,7 @@ def main():
                                           ctree_type=ctree_type,
                                           metric_types=['S', 'N', 'R', 'F'],
                                           digits=digits,
+                                          percent=percent,
                                           per_doc=per_doc,
                                           add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT))
@@ -601,6 +619,7 @@ def main():
                                       ctree_type=ctree_type,
                                       metric_types=None,
                                       digits=digits,
+                                      percent=percent,
                                       per_doc=per_doc,
                                       add_trivial_spans=eval_li_dep,
                                       stringent=STRINGENT))
@@ -657,16 +676,18 @@ def main():
         # _pred:
         ctree_dbl_pred = [corpus_dbl_pred[doc_name] for doc_name in docs_dbl]
         ctree_dbl_pred = [REL_CONV(x) for x in ctree_dbl_pred]
-        if binarize_true:  # maybe not?
-            ctree_dbl_pred = [_binarize(x) for x in ctree_dbl_pred]
+        if binarize_true != 'none':  # maybe not?
+            ctree_dbl_pred = [_binarize(x, branching=binarize_true)
+                              for x in ctree_dbl_pred]
         if simple_rsttree:
             ctree_dbl_pred = [SimpleRSTTree.from_rst_tree(x)
                               for x in ctree_dbl_pred]
         # _true:
         ctree_dbl_true = [corpus_dbl_true[doc_name] for doc_name in docs_dbl]
         ctree_dbl_true = [REL_CONV(x) for x in ctree_dbl_true]
-        if binarize_true:
-            ctree_dbl_true = [_binarize(x) for x in ctree_dbl_true]
+        if binarize_true != 'none':
+            ctree_dbl_true = [_binarize(x, branching=binarize_true)
+                              for x in ctree_dbl_true]
         if simple_rsttree:
             ctree_dbl_true = [SimpleRSTTree.from_rst_tree(x)
                               for x in ctree_dbl_true]
@@ -677,6 +698,7 @@ def main():
                                           span_type='chars',
                                           metric_types=['S', 'N', 'R', 'F'],
                                           digits=digits,
+                                          percent=percent,
                                           per_doc=per_doc,
                                           add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT))
