@@ -143,6 +143,18 @@ NUC_STRATEGY = 'unamb_else_most_frequent'
 NUC_CONSTANT = None  # only useful for NUC_STRATEGY='constant'
 RNK_STRATEGY = 'sdist-edist-rl'
 RNK_PRIORITY_SU = True
+# known 'authors'
+AUTHORS = [
+    'gold',  # RST-main
+    'silver',  # RST-double
+    'JCN15_1S1S', 'FH14_gSVM', 'FH14_gCRF', 'JE14',
+    'LLC16', 'HHN16_hilda', 'HHN16_mst',
+    'BPS16', 'BCS17_mono',
+    'BCS17_cross_dev',
+    'SHV15_D',
+    'li_sujian',
+    'ours-chain', 'ours-tree', 'ours-tree-su'
+]
 
 
 def setup_dtree_postprocessor(nary_enc='chain', order='strict',
@@ -198,29 +210,14 @@ def main():
         description="Evaluate parsers' output against a given reference")
     # predictions
     parser.add_argument('authors_pred', nargs='+',
-                        choices=['gold', 'silver',
-                                 'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi', 'hayashi_hilda', 'hayashi_mst',
-                                 'braud_coling', 'braud_eacl_mono',
-                                 'braud_eacl_cross_dev',
-                                 'surdeanu',
-                                 'li_sujian',
-                                 'ours_chain', 'ours_tree', 'ours_tree_su'],
+                        choices=AUTHORS,
                         help="Author(s) of the predictions")
     parser.add_argument('--nary_enc_pred', default='tree',
                         choices=['tree', 'chain'],
                         help="Encoding of n-ary nodes for the predictions")
     # reference
     parser.add_argument('--author_true', default='gold',
-                        choices=['each',  # NEW generate sim matrix
-                                 'gold', 'silver',
-                                 'joty', 'feng', 'feng2', 'ji',
-                                 'li_qi', 'hayashi_hilda', 'hayashi_mst',
-                                 'braud_coling', 'braud_eacl_mono',
-                                 'braud_eacl_cross_dev',
-                                 'surdeanu',
-                                 'li_sujian',
-                                 'ours_chain', 'ours_tree'],
+                        choices=AUTHORS + ['each'],  # NEW generate sim matrix
                         help="Author of the reference")
     # * ctree/dtree eval: the value of binarize_true determines the values
     # of nary_enc_true and order_true (the latter is yet unused)
@@ -291,11 +288,7 @@ def main():
     reader_test = RstReader(CD_TEST)
     corpus_test = reader_test.slurp()
 
-    # reference
-    # current assumption: author_true is 'gold'
-    if author_true != 'gold':
-        raise NotImplementedError('Not yet')
-
+    # reference: author_true can be any of the authors_pred (defaults to gold)
     ctree_true = dict()  # ctrees
     dtree_true = dict()  # dtrees from the original ctrees ('tree' transform)
     for doc_id, ct_true in sorted(corpus_test.items()):
@@ -317,66 +310,66 @@ def main():
 
     for author_pred in authors_pred:
         # braud coling 2016
-        if author_pred == 'braud_coling':
+        if author_pred == 'BPS16':
             c_preds.append(
-                ('braud_coling', load_braud_coling_ctrees(
+                ('BPS16', load_braud_coling_ctrees(
                     BRAUD_COLING_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('braud_coling', load_braud_coling_dtrees(
+                ('BPS16', load_braud_coling_dtrees(
                     BRAUD_COLING_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
         # braud eacl 2017 - mono
-        if author_pred == 'braud_eacl_mono':
+        if author_pred == 'BCS17_mono':
             c_preds.append(
-                ('braud_eacl_mono', load_braud_eacl_ctrees(
+                ('BCS17_mono', load_braud_eacl_ctrees(
                     BRAUD_EACL_MONO, REL_CONV, sorted_doc_names))
             )
             d_preds.append(
-                ('braud_eacl_mono', load_braud_eacl_dtrees(
+                ('BCS17_mono', load_braud_eacl_dtrees(
                     BRAUD_EACL_MONO, REL_CONV, sorted_doc_names,
                     nary_enc='chain'))
             )
         # braud eacl 2017 - cross+dev
-        if author_pred == 'braud_eacl_cross_dev':
+        if author_pred == 'BCS17_cross_dev':
             c_preds.append(
-                ('braud_eacl_cross_dev', load_braud_eacl_ctrees(
+                ('BCS17_cross_dev', load_braud_eacl_ctrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names))
             )
             d_preds.append(
-                ('braud_eacl_cross_dev', load_braud_eacl_dtrees(
+                ('BCS17_cross_dev', load_braud_eacl_dtrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names,
                     nary_enc='chain'))
             )
 
-        if author_pred == 'hayashi_hilda':
+        if author_pred == 'HHN16_hilda':
             c_preds.append(
-                ('hayashi_hilda', load_hayashi_hilda_ctrees(
+                ('HHN16_hilda', load_hayashi_hilda_ctrees(
                     HAYASHI_HILDA_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('hayashi_hilda', load_hayashi_hilda_dtrees(
+                ('HHN16_hilda', load_hayashi_hilda_dtrees(
                     HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
 
-        if author_pred == 'hayashi_mst':
+        if author_pred == 'HHN16_mst':
             c_preds.append(
-                ('hayashi_mst', load_hayashi_dep_ctrees(
+                ('HHN16_mst', load_hayashi_dep_ctrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
                     nuc_clf, rnk_clf))
             )
             d_preds.append(
-                ('hayashi_mst', load_hayashi_dep_dtrees(
+                ('HHN16_mst', load_hayashi_dep_dtrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
                     nuc_clf, rnk_clf))
             )
 
-        if author_pred == 'li_qi':
+        if author_pred == 'LLC16':
             c_preds.append(
-                ('li_qi', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
+                ('LLC16', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('li_qi', load_li_qi_dtrees(LI_QI_OUT_DIR, REL_CONV,
+                ('LLC16', load_li_qi_dtrees(LI_QI_OUT_DIR, REL_CONV,
                                             nary_enc='chain'))
             )
 
@@ -392,63 +385,63 @@ def main():
                     nuc_clf, rnk_clf))
             )
 
-        if author_pred == 'feng':
+        if author_pred == 'FH14_gSVM':
             c_preds.append(
-                ('gSVM', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
+                ('FH14_gSVM', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('gSVM', load_feng_dtrees(FENG1_OUT_DIR, REL_CONV,
-                                          nary_enc='chain'))
+                ('FH14_gSVM', load_feng_dtrees(FENG1_OUT_DIR, REL_CONV,
+                                               nary_enc='chain'))
             )
 
-        if author_pred == 'feng2':
+        if author_pred == 'FH14_gCRF':
             c_preds.append(
-                ('gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
+                ('FH14_gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
-                                          nary_enc='chain'))
+                ('FH14_gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
+                                               nary_enc='chain'))
             )
 
-        if author_pred == 'joty':
+        if author_pred == 'JCN15_1S1S':
             # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
             c_preds.append(
-                ('TSP 1-1', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
+                ('JCN15_1S1S', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('TSP 1-1', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
-                                              nary_enc='chain'))
+                ('JCN15_1S1S', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
+                                                 nary_enc='chain'))
             )
             # joty-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because codra outputs binary ctrees,
             # hence both encodings result in (the same) strictly ordered dtrees
 
-        if author_pred == 'ji':
+        if author_pred == 'JE14':
             # DPLP outputs RST ctrees in the form of lists of spans;
             # load_ji_dtrees maps them to RST dtrees
             c_preds.append(
-                ('DPLP', load_ji_ctrees(
+                ('JE14', load_ji_ctrees(
                     JI_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('DPLP', load_ji_dtrees(
+                ('JE14', load_ji_dtrees(
                     JI_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
             # ji-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because codra outputs binary ctrees,
             # hence both encodings result in (the same) strictly ordered dtrees
 
-        if author_pred == 'surdeanu':
+        if author_pred == 'SHV15_D':
             c_preds.append(
-                ('surdeanu', load_surdeanu_ctrees(
+                ('SHV15_D', load_surdeanu_ctrees(
                     SURDEANU_LOG_FILE, REL_CONV))
             )
             d_preds.append(
-                ('surdeanu', load_surdeanu_dtrees(
+                ('SHV15_D', load_surdeanu_dtrees(
                     SURDEANU_LOG_FILE, REL_CONV, nary_enc='chain'))
             )
 
-        if author_pred == 'ours_chain':
+        if author_pred == 'ours-chain':
             # Eisner, predicted syntax, chain
             c_preds.append(
                 ('ours-chain', load_attelo_ctrees(
@@ -459,7 +452,7 @@ def main():
                     EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
 
-        if author_pred == 'ours_tree':
+        if author_pred == 'ours-tree':
             # Eisner, predicted syntax, tree + same-unit
             c_preds.append(
                 ('ours-tree', load_attelo_ctrees(
@@ -469,7 +462,7 @@ def main():
                 ('ours-tree', load_attelo_dtrees(
                     EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
             )
-        if author_pred == 'ours_tree_su':
+        if author_pred == 'ours-tree-su':
             # Eisner, predicted syntax, tree + same-unit
             c_preds.append(
                 ('ours-tree-su', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
@@ -480,6 +473,14 @@ def main():
                 ('ours-tree-su', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
                                                     EDUS_FILE,
                                                     nuc_clf, rnk_clf))
+            )
+        # 2017-05-17 enable "gold" as parser, should give perfect scores
+        if author_pred == 'gold':
+            c_preds.append(
+                ('gold', ctree_true)
+            )
+            d_preds.append(
+                ('gold', dtree_true)
             )
 
         if False:  # FIXME repair (or forget) these
@@ -525,10 +526,18 @@ def main():
     # * table content
     # _true
     doc_names = sorted(dtree_true.keys())
-    dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
     labelset_true = set(itertools.chain.from_iterable(
-        x.labels for x in dtree_true_list))
+        x.labels for x in dtree_true.values()))
     labelset_true.add("span")  # RST-DT v.1.0 has an error in wsj_1189 7-9
+    # 2017-05-17 any author can be used as reference
+    # FIXME
+    # dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
+    dtree_true_list = []
+    for parser_name, dtree_pred in d_preds:
+        if parser_name == author_true:
+            dtree_true_list = [dtree_pred[doc_name] for doc_name in doc_names]
+            break
+    # end FIXME
     # _pred
     for parser_name, dtree_pred in d_preds:
         dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
@@ -539,8 +548,9 @@ def main():
             assert labelset_pred.issubset(labelset_true)
         except AssertionError:
             print(parser_name)
-            print('T - P', labelset_true - labelset_pred)
-            print('P - T', labelset_pred - labelset_true)
+            print('T & P', sorted(labelset_true.intersection(labelset_pred)))
+            print('T - P', sorted(labelset_true - labelset_pred))
+            print('P - T', sorted(labelset_pred - labelset_true))
             raise
         # end check
         all_scores = []
@@ -566,7 +576,15 @@ def main():
     ctree_type = 'SimpleRST' if simple_rsttree else 'RST'
 
     doc_names = sorted(ctree_true.keys())
-    ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
+    # ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
+    # FIXME
+    ctree_true_list = []
+    for parser_name, ctree_pred in c_preds:
+        if parser_name == author_true:
+            ctree_true_list = [ctree_pred[doc_name] for doc_name in doc_names]
+            break
+    # end FIXME
+
     if simple_rsttree:
         ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
                            for x in ctree_true_list]
@@ -632,6 +650,11 @@ def main():
 
     # 2017-04-11 compute agreement between human annotators, on DOUBLE
     if 'silver' in authors_pred:
+        # 'silver' can be meaningfully compared to 'gold' only (too few
+        # documents otherwise)
+        if author_true != 'gold':
+            raise NotImplementedError('Not yet')
+
         # read the annotation we'll consider as "silver"
         reader_dbl = RstReader(DOUBLE_DIR)
         corpus_dbl_pred = {k.doc: v for k, v in reader_dbl.slurp().items()}

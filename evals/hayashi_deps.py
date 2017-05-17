@@ -38,7 +38,7 @@ def _load_hayashi_dep_file(f, edus):
     dt: RstDepTree
         Predicted dtree
     """
-    dt = RstDepTree(edus=edus, origin=None, nary_enc='tree')  # FIXME origin
+    dt = RstDepTree(edus=edus, origin=None, nary_enc='chain')  # FIXME origin
     for line in f:
         line = line.strip()
         if not line:

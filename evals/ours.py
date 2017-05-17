@@ -10,6 +10,7 @@ import numpy as np
 
 from educe.annotation import Span as EduceSpan
 from educe.rst_dt.annotation import (EDU as EduceEDU, SimpleRSTTree)
+from educe.rst_dt.corpus import mk_key
 from educe.rst_dt.dep2con import (deptree_to_simple_rst_tree,
                                   deptree_to_rst_tree)
 from educe.rst_dt.deptree import RstDepTree, RstDtException
@@ -115,6 +116,7 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
                     raise ValueError('Weird root label: {}'.format(lbl))
             else:
                 dt_pred.add_dependency(gid2num[src_id], gid2num[tgt_id], lbl)
+        dt_pred.origin = mk_key(doc_name)
         # add nuclearity: heuristic baseline
         dt_pred.nucs = nuc_clf.predict([dt_pred])[0]
         # add rank: heuristic baseline, needs edu2sent
