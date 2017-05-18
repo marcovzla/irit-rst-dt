@@ -18,7 +18,8 @@ from educe.rst_dt.dep2con import (DummyNuclearityClassifier,
 from educe.rst_dt.deptree import RstDepTree
 from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
                                                rst_parseval_compact_report,
-                                               rst_parseval_report)
+                                               rst_parseval_report,
+                                               rst_parseval_similarity)
 #
 from attelo.metrics.deptree import (compute_uas_las,
                                     compute_uas_las_undirected)
@@ -532,69 +533,65 @@ def main():
     # 2017-05-17 any author can be used as reference
     # FIXME
     # dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
-    dtree_true_list = []
-    for parser_name, dtree_pred in d_preds:
-        if parser_name == author_true:
-            dtree_true_list = [dtree_pred[doc_name] for doc_name in doc_names]
-            break
-    # end FIXME
-    # _pred
-    for parser_name, dtree_pred in d_preds:
-        dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
-        # check that labelset_pred is a subset of labelset_true
-        labelset_pred = set(itertools.chain.from_iterable(
-            x.labels for x in dtree_pred_list))
-        try:
-            assert labelset_pred.issubset(labelset_true)
-        except AssertionError:
-            print(parser_name)
-            print('T & P', sorted(labelset_true.intersection(labelset_pred)))
-            print('T - P', sorted(labelset_true - labelset_pred))
-            print('P - T', sorted(labelset_pred - labelset_true))
-            raise
-        # end check
-        all_scores = []
-        all_scores += list(compute_uas_las(
-            dtree_true_list, dtree_pred_list, metrics=dep_metrics,
-            doc_names=doc_names))
-        if UNDIRECTED_DEPS:
-            score_uuas, score_ulas = compute_uas_las_undirected(
-                dtree_true_list, dtree_pred_list)
-            all_scores += [score_uuas, score_ulas]
-        # append to report
-        values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
-        for v in all_scores:
-            if percent:
-                v = v * 100.0
-            values += ["{0:0.{1}f}".format(v, dep_digits)]
-        report += fmt % tuple(values)
-    # end table content
-    print(report)
-    # end report
+    parsers_true = [author_true] if author_true != 'each' else authors_pred
+    for parser_true in parsers_true:
+        dtree_true_list = []
+        for parser_name, dtree_pred in d_preds:
+            if parser_name == parser_true:
+                dtree_true_list = [dtree_pred[doc_name] for doc_name in doc_names]
+                break
+        # end FIXME
+        # _pred
+        for parser_name, dtree_pred in d_preds:
+            dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
+            # check that labelset_pred is a subset of labelset_true
+            labelset_pred = set(itertools.chain.from_iterable(
+                x.labels for x in dtree_pred_list))
+            try:
+                assert labelset_pred.issubset(labelset_true)
+            except AssertionError:
+                print(parser_name)
+                print('T & P', sorted(labelset_true.intersection(labelset_pred)))
+                print('T - P', sorted(labelset_true - labelset_pred))
+                print('P - T', sorted(labelset_pred - labelset_true))
+                raise
+            # end check
+            all_scores = []
+            all_scores += list(compute_uas_las(
+                dtree_true_list, dtree_pred_list, metrics=dep_metrics,
+                doc_names=doc_names))
+            if UNDIRECTED_DEPS:
+                score_uuas, score_ulas = compute_uas_las_undirected(
+                    dtree_true_list, dtree_pred_list)
+                all_scores += [score_uuas, score_ulas]
+            # append to report
+            values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
+            for v in all_scores:
+                if percent:
+                    v = v * 100.0
+                values += ["{0:0.{1}f}".format(v, dep_digits)]
+            report += fmt % tuple(values)
+        # end table content
+        print(report)
+        # end report
 
     # constituency eval
     ctree_type = 'SimpleRST' if simple_rsttree else 'RST'
 
     doc_names = sorted(ctree_true.keys())
-    # ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
-    # FIXME
-    ctree_true_list = []
-    for parser_name, ctree_pred in c_preds:
-        if parser_name == author_true:
-            ctree_true_list = [ctree_pred[doc_name] for doc_name in doc_names]
-            break
-    # end FIXME
 
-    if simple_rsttree:
-        ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
-                           for x in ctree_true_list]
-    # WIP print SimpleRSTTrees
-    if not os.path.exists('gold'):
-        os.makedirs('gold')
-    for doc_name, ct in zip(doc_names, ctree_true_list):
-        with codecs.open('gold/' + ct.origin.doc, mode='w',
-                         encoding='utf-8') as f:
-            print(ct, file=f)
+    if False:  # back when 'gold' was the only possible ref
+        ctree_true_list = [ctree_true[doc_name] for doc_name in doc_names]
+        if simple_rsttree:
+            ctree_true_list = [SimpleRSTTree.from_rst_tree(x)
+                               for x in ctree_true_list]
+        # WIP print SimpleRSTTrees
+        if not os.path.exists('gold'):
+            os.makedirs('gold')
+        for doc_name, ct in zip(doc_names, ctree_true_list):
+            with codecs.open('gold/' + ct.origin.doc, mode='w',
+                             encoding='utf-8') as f:
+                print(ct, file=f)
 
     # sort the predictions of each parser, so they match the order of
     # documents and reference trees in _true
@@ -606,47 +603,75 @@ def main():
                         [SimpleRSTTree.from_rst_tree(x)
                          for x in ctree_pred_list])
                        for parser_name, ctree_pred_list in ctree_preds]
+
+    # 2017-05-17 allow any parser to be ref
     # generate report
     if detailed == 0:
-        # compact report, f1-scores only
-        print(rst_parseval_compact_report(author_true, ctree_preds,
+        # 2017-05-17 WIP similarity matrix: author_true='each': restrict
+        # to the S metric only, so as to display a sim. matrix
+        if author_true == 'each':
+            metric_type = 'S'
+            print(rst_parseval_similarity(ctree_preds,
                                           ctree_type=ctree_type,
-                                          metric_types=['S', 'N', 'R', 'F'],
+                                          metric_type=metric_type,
+                                          digits=digits,
+                                          percent=percent,
+                                          print_support=False,
+                                          per_doc=per_doc,
+                                          add_trivial_spans=eval_li_dep,
+                                          stringent=STRINGENT,
+                                          out_format='latex'))
+        else:
+            metric_types = ['S', 'N', 'R', 'F']
+            # compact report, f1-scores only
+            print(rst_parseval_compact_report(author_true, ctree_preds,
+                                              ctree_type=ctree_type,
+                                              metric_types=metric_types,
+                                              digits=digits,
+                                              percent=percent,
+                                              per_doc=per_doc,
+                                              add_trivial_spans=eval_li_dep,
+                                              stringent=STRINGENT))
+    else:
+        parsers_true = [author_true] if author_true != 'each' else authors_pred
+        for parser_true in parsers_true:
+            # standard reports: 1 table per parser, 1 line per metric,
+            # cols = [p, r, f1, support_true, support_pred]
+            # FIXME
+            ctree_true_list = []
+            for parser_name, ctree_pred in c_preds:
+                if parser_name == parser_true:
+                    ctree_true_list = [ctree_pred[doc_name] for doc_name in doc_names]
+                    break
+            # end FIXME
+
+            for parser_name, ctree_pred_list in ctree_preds:
+                # WIP print SimpleRSTTrees
+                if not os.path.exists(parser_name):
+                    os.makedirs(parser_name)
+                for doc_name, ct in zip(doc_names, ctree_pred_list):
+                    with codecs.open(parser_name + '/' + doc_name, mode='w',
+                                     encoding='utf-8') as f:
+                        print(ct, file=f)
+
+                # compute and print PARSEVAL scores
+                print(parser_name)
+                # metric_types=None includes the variants with head:
+                # S+H, N+H, R+H, F+H
+                print(rst_parseval_report(ctree_true_list, ctree_pred_list,
+                                          ctree_type=ctree_type,
+                                          metric_types=None,
                                           digits=digits,
                                           percent=percent,
                                           per_doc=per_doc,
                                           add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT))
-    else:
-        # standard reports: 1 table per parser, 1 line per metric,
-        # cols = [p, r, f1, support_true, support_pred]
-        for parser_name, ctree_pred_list in ctree_preds:
-            # WIP print SimpleRSTTrees
-            if not os.path.exists(parser_name):
-                os.makedirs(parser_name)
-            for doc_name, ct in zip(doc_names, ctree_pred_list):
-                with codecs.open(parser_name + '/' + doc_name, mode='w',
-                                 encoding='utf-8') as f:
-                    print(ct, file=f)
-
-            # compute and print PARSEVAL scores
-            print(parser_name)
-            # metric_types=None includes the variants with head:
-            # S+H, N+H, R+H, F+H
-            print(rst_parseval_report(ctree_true_list, ctree_pred_list,
-                                      ctree_type=ctree_type,
-                                      metric_types=None,
-                                      digits=digits,
-                                      percent=percent,
-                                      per_doc=per_doc,
-                                      add_trivial_spans=eval_li_dep,
-                                      stringent=STRINGENT))
-            # detailed report on R
-            if detailed >= 2:
-                print(rst_parseval_detailed_report(
-                    ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
-                    metric_type='R'))
-            # end FIXME
+                # detailed report on R
+                if detailed >= 2:
+                    print(rst_parseval_detailed_report(
+                        ctree_true_list, ctree_pred_list, ctree_type=ctree_type,
+                        metric_type='R'))
+                # end FIXME
 
     # 2017-04-11 compute agreement between human annotators, on DOUBLE
     if 'silver' in authors_pred:
