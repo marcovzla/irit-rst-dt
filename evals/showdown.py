@@ -22,7 +22,7 @@ from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
                                                rst_parseval_similarity)
 #
 from attelo.metrics.deptree import (compute_uas_las,
-                                    compute_uas_las_undirected)
+                                    dep_compact_report)
 
 # local to this package
 from evals.braud_coling import (load_braud_coling_ctrees,
@@ -137,7 +137,6 @@ SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/replication/surdeanu/output/log'
 STRINGENT = False
 # additional dependency metrics
 INCLUDE_LS = False
-UNDIRECTED_DEPS = False
 EVAL_NUC_RANK = True
 # hyperparams
 NUC_STRATEGY = 'unamb_else_most_frequent'
@@ -506,74 +505,21 @@ def main():
         dep_metrics += ["tag_R"]
     if EVAL_NUC_RANK:
         dep_metrics += ["R+N", "R+O", "F"]
-    # report
-    # * table format
-    width = max(len(parser_name) for parser_name, _ in d_preds)
-    headers = dep_metrics
-    if UNDIRECTED_DEPS:
-        headers += ["UUAS", "ULAS"]
-    fmt = '%% %ds' % width  # first col: parser name
-    fmt += '  '
-    fmt += ' '.join(['% 9s' for _ in headers])
-    fmt += '\n'
 
-    headers = [""] + headers
-    report = fmt % tuple(headers)
-    report += '\n'
-    # display percentages
-    dep_digits = digits - 2 if percent else digits
-    # end table format and header line
-
-    # * table content
     # _true
     doc_names = sorted(dtree_true.keys())
     labelset_true = set(itertools.chain.from_iterable(
         x.labels for x in dtree_true.values()))
     labelset_true.add("span")  # RST-DT v.1.0 has an error in wsj_1189 7-9
     # 2017-05-17 any author can be used as reference
-    # FIXME
-    # dtree_true_list = [dtree_true[doc_name] for doc_name in doc_names]
-    parsers_true = [author_true] if author_true != 'each' else authors_pred
-    for parser_true in parsers_true:
-        dtree_true_list = []
-        for parser_name, dtree_pred in d_preds:
-            if parser_name == parser_true:
-                dtree_true_list = [dtree_pred[doc_name] for doc_name in doc_names]
-                break
-        # end FIXME
-        # _pred
-        for parser_name, dtree_pred in d_preds:
-            dtree_pred_list = [dtree_pred[doc_name] for doc_name in doc_names]
-            # check that labelset_pred is a subset of labelset_true
-            labelset_pred = set(itertools.chain.from_iterable(
-                x.labels for x in dtree_pred_list))
-            try:
-                assert labelset_pred.issubset(labelset_true)
-            except AssertionError:
-                print(parser_name)
-                print('T & P', sorted(labelset_true.intersection(labelset_pred)))
-                print('T - P', sorted(labelset_true - labelset_pred))
-                print('P - T', sorted(labelset_pred - labelset_true))
-                raise
-            # end check
-            all_scores = []
-            all_scores += list(compute_uas_las(
-                dtree_true_list, dtree_pred_list, metrics=dep_metrics,
-                doc_names=doc_names))
-            if UNDIRECTED_DEPS:
-                score_uuas, score_ulas = compute_uas_las_undirected(
-                    dtree_true_list, dtree_pred_list)
-                all_scores += [score_uuas, score_ulas]
-            # append to report
-            values = ['{pname: <{fill}}'.format(pname=parser_name, fill=width)]
-            for v in all_scores:
-                if percent:
-                    v = v * 100.0
-                values += ["{0:0.{1}f}".format(v, dep_digits)]
-            report += fmt % tuple(values)
-        # end table content
-        print(report)
-        # end report
+    if author_true != 'each':
+        parser_true = author_true
+        print(dep_compact_report(parser_true, d_preds, dep_metrics,
+                                 doc_names, labelset_true,
+                                 digits=digits,
+                                 percent=percent))
+    else:
+        raise ValueError("Sim matrix on dependencies not implemented yet")
 
     # constituency eval
     ctree_type = 'SimpleRST' if simple_rsttree else 'RST'
@@ -722,11 +668,17 @@ def main():
         # create parallel lists of ctrees for _true and _pred, mapped to
         # coarse rels and binarized
         # _pred:
+        # * ctree
         ctree_dbl_pred = [corpus_dbl_pred[doc_name] for doc_name in docs_dbl]
         ctree_dbl_pred = [REL_CONV(x) for x in ctree_dbl_pred]
         if binarize_true != 'none':  # maybe not?
             ctree_dbl_pred = [_binarize(x, branching=binarize_true)
                               for x in ctree_dbl_pred]
+        # * dtree (as dict from doc_name to dtree !?)
+        dtree_dbl_pred = {doc_name: RstDepTree.from_rst_tree(
+            ct, nary_enc=nary_enc_true)
+                          for doc_name, ct in zip(docs_dbl, ctree_dbl_pred)}
+        # * simple_rsttree (?)
         if simple_rsttree:
             ctree_dbl_pred = [SimpleRSTTree.from_rst_tree(x)
                               for x in ctree_dbl_pred]
@@ -736,10 +688,15 @@ def main():
         if binarize_true != 'none':
             ctree_dbl_true = [_binarize(x, branching=binarize_true)
                               for x in ctree_dbl_true]
+        # * dtree (as dict from doc_name to dtree !?)
+        dtree_dbl_true = {doc_name: RstDepTree.from_rst_tree(
+            ct, nary_enc=nary_enc_true)
+                          for doc_name, ct in zip(docs_dbl, ctree_dbl_true)}
         if simple_rsttree:
             ctree_dbl_true = [SimpleRSTTree.from_rst_tree(x)
                               for x in ctree_dbl_true]
         # generate report
+        # * ctree eval
         ctree_dbl_preds = [('silver', ctree_dbl_pred),
                            ('gold', ctree_dbl_true)]
         print(rst_parseval_compact_report(author_true, ctree_dbl_preds,
@@ -751,6 +708,16 @@ def main():
                                           per_doc=per_doc,
                                           add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT))
+        # * dtree eval
+        if False:
+            # TODO cope with differences in segmentation
+            dtree_dbl_preds = [('silver', dtree_dbl_pred),
+                               ('gold', dtree_dbl_true)]
+            print(dep_compact_report(author_true, dtree_dbl_preds,
+                                     dep_metrics, docs_dbl,
+                                     labelset_true,
+                                     digits=digits,
+                                     percent=percent))
     # end 2017-04-11 agreement between human annotators
 
 
