@@ -519,7 +519,8 @@ def main():
                                  digits=digits,
                                  percent=percent))
     else:
-        raise ValueError("Sim matrix on dependencies not implemented yet")
+        pass
+        # raise ValueError("Sim matrix on dependencies not implemented yet")
 
     # constituency eval
     ctree_type = 'SimpleRST' if simple_rsttree else 'RST'
