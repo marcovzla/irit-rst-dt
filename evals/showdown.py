@@ -22,7 +22,8 @@ from educe.rst_dt.metrics.rst_parseval import (rst_parseval_detailed_report,
                                                rst_parseval_similarity)
 #
 from attelo.metrics.deptree import (compute_uas_las,
-                                    dep_compact_report)
+                                    dep_compact_report,
+                                    dep_similarity)
 
 # local to this package
 from evals.braud_coling import (load_braud_coling_ctrees,
@@ -150,7 +151,7 @@ AUTHORS = [
     'JCN15_1S1S', 'FH14_gSVM', 'FH14_gCRF', 'JE14',
     'LLC16', 'HHN16_hilda', 'HHN16_mst',
     'BPS16', 'BCS17_mono',
-    'BCS17_cross_dev',
+    'BCS17_cross',
     'SHV15_D',
     'li_sujian',
     'ours-chain', 'ours-tree', 'ours-tree-su'
@@ -331,13 +332,13 @@ def main():
                     nary_enc='chain'))
             )
         # braud eacl 2017 - cross+dev
-        if author_pred == 'BCS17_cross_dev':
+        if author_pred == 'BCS17_cross':
             c_preds.append(
-                ('BCS17_cross_dev', load_braud_eacl_ctrees(
+                ('BCS17_cross', load_braud_eacl_ctrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names))
             )
             d_preds.append(
-                ('BCS17_cross_dev', load_braud_eacl_dtrees(
+                ('BCS17_cross', load_braud_eacl_dtrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names,
                     nary_enc='chain'))
             )
@@ -519,7 +520,9 @@ def main():
                                  digits=digits,
                                  percent=percent))
     else:
-        pass
+        print(dep_similarity(d_preds, doc_names, labelset_true,
+                             dep_metric='U', digits=digits, percent=percent,
+                             out_format='latex'))
         # raise ValueError("Sim matrix on dependencies not implemented yet")
 
     # constituency eval
