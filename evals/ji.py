@@ -136,6 +136,12 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
                         node.rel = 'topic-change'
                     elif node.rel == 'topiccomment':  # Ji's output
                         node.rel = 'topic-comment'
+                    elif node.rel == 'textual-organization':  # WLW17 output
+                        # we use 'textual' as the coarse label ;
+                        # JE14 outputs textualorganization which is the
+                        # fine label in our taxonomy, hence is mapped to
+                        # textual beforehand
+                        node.rel = 'textual'
             # end normalize
         # store the resulting RSTTree
         ctree_pred[doc_name] = ct_pred

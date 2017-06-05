@@ -133,6 +133,8 @@ BRAUD_EACL_CROSS_DEV = '/home/mmorey/melodi/rst/replication/braud/eacl16/best-en
 SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/replication/surdeanu/output/log'
 # Li Sujian dep parser
 # imported, see above
+# Wang, Li and Wang at ACL 2017
+WLW17_OUT_DIR = '/home/mmorey/melodi/rst/replication/wang/rst-dt/RSTtrees-WSJ-main-1.0/TEST'
 
 # level of detail for parseval
 STRINGENT = False
@@ -153,6 +155,7 @@ AUTHORS = [
     'BPS16', 'BCS17_mono',
     'BCS17_cross',
     'SHV15_D',
+    'WLW17',  # Wang, Li and Wang, ACL17
     'li_sujian',
     'ours-chain', 'ours-tree', 'ours-tree-su'
 ]
@@ -429,7 +432,22 @@ def main():
                     JI_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
             # ji-{chain,tree} would be the same except nary_enc='tree' ;
-            # the nary_enc does not matter because codra outputs binary ctrees,
+            # the nary_enc does not matter because DPLP outputs binary ctrees,
+            # hence both encodings result in (the same) strictly ordered dtrees
+
+        if author_pred == 'WLW17':
+            # WLW17 outputs RST ctrees in the form of lists of spans, just
+            # like JE14 ;
+            # load_ji_dtrees maps them to RST dtrees
+            c_preds.append(
+                ('WLW17', load_ji_ctrees(
+                    WLW17_OUT_DIR, REL_CONV))
+            )
+            d_preds.append(
+                ('WLW17', load_ji_dtrees(
+                    WLW17_OUT_DIR, REL_CONV, nary_enc='chain'))
+            )
+            # the nary_enc does not matter because WLW17 outputs binary ctrees,
             # hence both encodings result in (the same) strictly ordered dtrees
 
         if author_pred == 'SHV15_D':
