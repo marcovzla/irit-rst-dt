@@ -29,7 +29,7 @@ from attelo.metrics.deptree import (compute_uas_las,
 from evals.braud_coling import (load_braud_coling_ctrees,
                                 load_braud_coling_dtrees)
 from evals.braud_eacl import (load_braud_eacl_ctrees,
-                                load_braud_eacl_dtrees)
+                              load_braud_eacl_dtrees)
 from evals.codra import load_codra_ctrees, load_codra_dtrees
 from evals.feng import load_feng_ctrees, load_feng_dtrees
 from evals.gcrf_tree_format import load_gcrf_ctrees, load_gcrf_dtrees
@@ -67,7 +67,8 @@ REL_CONV_DTREE = REL_CONV_BASE.convert_dtree
 
 # * syntax: pred vs gold
 # old-style .edu_input: whole test set
-EDUS_FILE = os.path.join('/home/mmorey/melodi/rst',
+EDUS_FILE = os.path.join('/home/mmorey',
+                         'melodi/rst',
                          'irit-rst-dt/TMP/syn_gold_coarse',
                          'TEST.relations.sparse.edu_input')
 
@@ -78,20 +79,23 @@ EDUS_FILE_PAT = "TMP/2016-09-30T1701/data/TEST/{}.relations.edu-pairs.sparse.edu
 
 # outputs of parsers
 EISNER_OUT_SYN_PRED = os.path.join(
-    '/home/mmorey/melodi/rst',
+    '/home/mmorey',
+    'melodi/rst',
     'irit-rst-dt/TMP/syn_pred_coarse',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 # 2016-09-14 "tree" transform, predicted syntax
 EISNER_OUT_TREE_SYN_PRED = os.path.join(
-    '/home/mmorey/melodi/rst',
+    '/home/mmorey',
+    'melodi/rst',
     'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
-    '/home/mmorey/melodi/rst',
+    '/home/mmorey',
+    'melodi/rst',
     'irit-rst-dt/TMP/2016-09-12T0825',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt_su-eisner')
@@ -99,28 +103,37 @@ EISNER_OUT_TREE_SYN_PRED_SU = os.path.join(
 
 
 EISNER_OUT_SYN_PRED_SU = os.path.join(
-    '/home/mmorey/melodi/rst',
+    '/home/mmorey',
+    'melodi/rst',
     'irit-rst-dt/TMP/latest',  # lbl
     'scratch-current/combined',
     'output.maxent-AD.L-jnt_su-eisner')
 
 EISNER_OUT_SYN_GOLD = os.path.join(
-    '/home/mmorey/melodi/rst',
+    '/home/mmorey',
+    'melodi/rst',
     'irit-rst-dt/TMP/syn_gold_coarse',  # lbl
     'scratch-current/combined',
     'output.maxent-iheads-global-AD.L-jnt-eisner')
 
 # output of Joty's parser CODRA
-CODRA_OUT_DIR = '/home/mmorey/melodi/rst/replication/joty/Doc-level'
+CODRA_OUT_DIR = os.path.join(
+    '/home/mmorey',
+    'melodi/rst/replication/joty/Doc-level'
+)
 # output of Ji's parser DPLP
 # JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/replication/ji_eisenstein', 'DPLP/data/docs/test/')
-JI_OUT_DIR = os.path.join('/home/mmorey/melodi/rst/replication/ji_eisenstein', 'official_output/outputs/')
+JI_OUT_DIR = os.path.join('/home/mmorey',
+                          'melodi/rst/replication/ji_eisenstein',
+                          'official_output/outputs/')
 # Feng's parsers
-FENG_DIR = '/home/mmorey/melodi/rst/replication/feng_hirst/'
+FENG_DIR = os.path.join('/home/mmorey',
+                        'melodi/rst/replication/feng_hirst/')
 FENG1_OUT_DIR = os.path.join(FENG_DIR, 'phil', 'tmp')
 FENG2_OUT_DIR = os.path.join(FENG_DIR, 'gCRF_dist/texts/results/test_batch_gold_seg')
 # Li Qi's parser
-LI_QI_OUT_DIR = '/home/mmorey/melodi/rst/replication/li_qi/result'
+LI_QI_OUT_DIR = os.path.join('/home/mmorey',
+                             'melodi/rst/replication/li_qi/result')
 # Hayashi's HILDA
 HAYASHI_OUT_DIR = '/home/mmorey/melodi/rst/replication/hayashi/SIGDIAL'
 HAYASHI_HILDA_OUT_DIR = os.path.join(HAYASHI_OUT_DIR, 'auto_parse/cons/HILDA')
@@ -134,7 +147,9 @@ SURDEANU_LOG_FILE = '/home/mmorey/melodi/rst/replication/surdeanu/output/log'
 # Li Sujian dep parser
 # imported, see above
 # Wang, Li and Wang at ACL 2017
-WLW17_OUT_DIR = '/home/mmorey/melodi/rst/replication/wang/rst-dt/RSTtrees-WSJ-main-1.0/TEST'
+WLW17_OUT_DIR = os.path.join(
+    '/home/mmorey',
+    'melodi/rst/replication/wang/rst-dt/RSTtrees-WSJ-main-1.0/TEST')
 
 # level of detail for parseval
 STRINGENT = False
@@ -523,7 +538,7 @@ def main():
     if INCLUDE_LS:
         dep_metrics += ["tag_R"]
     if EVAL_NUC_RANK:
-        dep_metrics += ["R+N", "R+O", "F"]
+        dep_metrics += ["N+O", "R+N", "F"]  # 2017-11-29 disable "R+O"
 
     # _true
     doc_names = sorted(dtree_true.keys())
@@ -590,7 +605,10 @@ def main():
                                           stringent=STRINGENT,
                                           out_format='latex'))
         else:
-            metric_types = ['S', 'N', 'R', 'F']
+            metric_types = [
+                'S', 'N', 'R', 'F',
+                'S+H', 'N+H', 'R+H', 'F+H',
+            ]
             # compact report, f1-scores only
             print(rst_parseval_compact_report(author_true, ctree_preds,
                                               ctree_type=ctree_type,
