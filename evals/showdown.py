@@ -166,7 +166,7 @@ AUTHORS = [
     'gold',  # RST-main
     'silver',  # RST-double
     'JCN15_1S1S', 'FH14_gSVM', 'FH14_gCRF', 'JE14',
-    'LLC16', 'HHN16_hilda', 'HHN16_mst',
+    'LLC16', 'HHN16_HILDA', 'HHN16_MST',
     'BPS16', 'BCS17_mono',
     'BCS17_cross',
     'SHV15_D',
@@ -261,6 +261,9 @@ def main():
                         help='Scores are displayed as percentages (ex: 57.9)')
     parser.add_argument('--detailed', type=int, default=0,
                         help='Level of detail for evaluations')
+    parser.add_argument('--out_fmt', default='text',
+                        choices=['text', 'latex'],
+                        help='Output format')
     #
     args = parser.parse_args()
     author_true = args.author_true
@@ -276,6 +279,7 @@ def main():
             raise ValueError('--percent requires --digits >= 3')
     # level of detail for evals
     detailed = args.detailed
+    out_fmt = args.out_fmt
 
     # "per_doc = True" computes p, r, f as in DPLP: compute scores per doc
     # then average over docs
@@ -361,24 +365,24 @@ def main():
                     nary_enc='chain'))
             )
 
-        if author_pred == 'HHN16_hilda':
+        if author_pred == 'HHN16_HILDA':
             c_preds.append(
-                ('HHN16_hilda', load_hayashi_hilda_ctrees(
+                ('HHN16_HILDA', load_hayashi_hilda_ctrees(
                     HAYASHI_HILDA_OUT_DIR, REL_CONV))
             )
             d_preds.append(
-                ('HHN16_hilda', load_hayashi_hilda_dtrees(
+                ('HHN16_HILDA', load_hayashi_hilda_dtrees(
                     HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain'))
             )
 
-        if author_pred == 'HHN16_mst':
+        if author_pred == 'HHN16_MST':
             c_preds.append(
-                ('HHN16_mst', load_hayashi_dep_ctrees(
+                ('HHN16_MST', load_hayashi_dep_ctrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
                     nuc_clf, rnk_clf))
             )
             d_preds.append(
-                ('HHN16_mst', load_hayashi_dep_dtrees(
+                ('HHN16_MST', load_hayashi_dep_dtrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
                     nuc_clf, rnk_clf))
             )
@@ -533,12 +537,12 @@ def main():
     # dependency eval
     dep_metrics = ["U"]
     if EVAL_NUC_RANK:
-        dep_metrics += ['O', 'N']
+        dep_metrics += ['O', 'N', 'O+N']
     dep_metrics += ["R"]
     if INCLUDE_LS:
         dep_metrics += ["tag_R"]
     if EVAL_NUC_RANK:
-        dep_metrics += ["N+O", "R+N", "F"]  # 2017-11-29 disable "R+O"
+        dep_metrics += ["R+N", "F"]  # 2017-11-29 disable "R+O"
 
     # _true
     doc_names = sorted(dtree_true.keys())
@@ -551,11 +555,12 @@ def main():
         print(dep_compact_report(parser_true, d_preds, dep_metrics,
                                  doc_names, labelset_true,
                                  digits=digits,
-                                 percent=percent))
+                                 percent=percent,
+                                 out_format=out_fmt))
     else:
         print(dep_similarity(d_preds, doc_names, labelset_true,
                              dep_metric='U', digits=digits, percent=percent,
-                             out_format='latex'))
+                             out_format=out_fmt))
         # raise ValueError("Sim matrix on dependencies not implemented yet")
 
     # constituency eval
@@ -603,11 +608,15 @@ def main():
                                           per_doc=per_doc,
                                           add_trivial_spans=eval_li_dep,
                                           stringent=STRINGENT,
-                                          out_format='latex'))
+                                          out_format=out_fmt))
         else:
             metric_types = [
                 'S', 'N', 'R', 'F',
-                'S+H', 'N+H', 'R+H', 'F+H',
+                # 'S+H', 'N+H', 'R+H', 'F+H',
+                # 'S+K', 'N+K', 'R+K', 'F+K',
+                # 'S+HH', 'N+HH', 'R+HH', 'F+HH',
+                # 'S+K+HH', 'N+K+HH', 'R+K+HH', 'F+K+HH',
+                'S+H+K+HH', 'N+H+K+HH', 'R+H+K+HH', 'F+H+K+HH',
             ]
             # compact report, f1-scores only
             print(rst_parseval_compact_report(author_true, ctree_preds,
@@ -615,9 +624,11 @@ def main():
                                               metric_types=metric_types,
                                               digits=digits,
                                               percent=percent,
+                                              print_support=False,
                                               per_doc=per_doc,
                                               add_trivial_spans=eval_li_dep,
-                                              stringent=STRINGENT))
+                                              stringent=STRINGENT,
+                                              out_format=out_fmt))
     else:
         parsers_true = [author_true] if author_true != 'each' else authors_pred
         for parser_true in parsers_true:
