@@ -10,6 +10,8 @@ import codecs
 import itertools
 import os
 
+from sklearn.datasets import load_svmlight_files
+
 from educe.rst_dt.annotation import _binarize, SimpleRSTTree
 from educe.rst_dt.corpus import (RstRelationConverter,
                                  Reader as RstReader)
@@ -46,6 +48,9 @@ from evals.ours import (load_deptrees_from_attelo_output,
                         load_attelo_ctrees,
                         load_attelo_dtrees)
 from evals.surdeanu import load_surdeanu_ctrees, load_surdeanu_dtrees
+# 2017-12-12 nuc_clf WIP
+from evals.train_nuc_classifier import RightBinaryNuclearityClassifier
+# end WIP nuc_clf
 
 # RST corpus
 CORPUS_DIR = os.path.join('corpus', 'RSTtrees-WSJ-main-1.01/')
@@ -204,13 +209,36 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
     y_nuc_train = []
     y_rnk_train = []
     for doc_name, dt in sorted(dtree_true.items()):
+        # print(dt.__dict__)
+        # raise ValueError('wip wip nuc_clf')
         X_train.append(dt)
         y_nuc_train.append(dt.nucs)
         y_rnk_train.append(dt.ranks)
     # nuclearity clf
-    nuc_clf = DummyNuclearityClassifier(strategy=nuc_strategy,
-                                        constant=nuc_constant)
-    nuc_clf.fit(X_train, y_nuc_train)
+    if False:
+        nuc_clf = DummyNuclearityClassifier(strategy=nuc_strategy,
+                                            constant=nuc_constant)
+        nuc_clf.fit(X_train, y_nuc_train)
+    else:
+        # 2017-12-12 WIP nuc_clf
+        # shiny new nuc_clf ; still very hacky
+        # import the nuclearity TRAIN and TEST sets generated from
+        # the svmlight feature vectors (ahem)
+        dset_folder = os.path.join(
+            os.path.expanduser('~'),
+            'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC'
+        )
+        dset_train = os.path.join(dset_folder, 'TRAINING.relations.sparse')
+        dset_test = os.path.join(dset_folder, 'TEST.relations.sparse')
+        # FIXME read n_features from .vocab
+        X_nuc_train, y_nuc_train, X_nuc_test, y_nuc_test = load_svmlight_files(
+            (dset_train, dset_test),
+            n_features=46731,
+            zero_based=False
+        )
+        nuc_clf = RightBinaryNuclearityClassifier()
+        nuc_clf = nuc_clf.fit(X_nuc_train, y_nuc_train)
+        # end WIP nuc_clf
     # rank clf
     rnk_clf = InsideOutAttachmentRanker(
         strategy=rnk_strategy, prioritize_same_unit=rnk_prioritize_same_unit,
@@ -612,11 +640,11 @@ def main():
         else:
             metric_types = [
                 'S', 'N', 'R', 'F',
-                # 'S+H', 'N+H', 'R+H', 'F+H',
+                'S+H', 'N+H', 'R+H', 'F+H',
                 # 'S+K', 'N+K', 'R+K', 'F+K',
                 # 'S+HH', 'N+HH', 'R+HH', 'F+HH',
                 # 'S+K+HH', 'N+K+HH', 'R+K+HH', 'F+K+HH',
-                'S+H+K+HH', 'N+H+K+HH', 'R+H+K+HH', 'F+H+K+HH',
+                # 'S+H+K+HH', 'N+H+K+HH', 'R+H+K+HH', 'F+H+K+HH',
             ]
             # compact report, f1-scores only
             print(rst_parseval_compact_report(author_true, ctree_preds,
