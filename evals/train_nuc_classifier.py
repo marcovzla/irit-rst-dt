@@ -15,8 +15,7 @@ import os
 
 from sklearn.datasets import load_svmlight_file, load_svmlight_files
 from sklearn.model_selection import cross_val_score
-from sklearn.linear_model.logistic import LogisticRegression
-# from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model.logistic import LogisticRegression, LogisticRegressionCV
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 
@@ -36,7 +35,8 @@ if False:
         (dset_train, dset_test),
         zero_based=False
     )
-    nuc_clf = LogisticRegression(penalty='l1', n_jobs=2)
+    nuc_clf = LogisticRegressionCV(penalty='l1', solver='liblinear',
+                                   n_jobs=2)
     # train nuclearity classifier, cross-validate performance on train
     scores = cross_val_score(nuc_clf, X_train, y_train, cv=10)
     print(scores)
@@ -92,7 +92,7 @@ class RightBinaryNuclearityClassifier(object):
         Binary classifier for right dependencies: NN vs NS.
     """
 
-    def __init__(self, bin_clf=LogisticRegression(penalty='l1', n_jobs=2)):
+    def __init__(self, bin_clf=LogisticRegression(penalty='l1', solver='liblinear', n_jobs=2)):
         """Init"""
         self.bin_clf = bin_clf
 
@@ -143,5 +143,6 @@ class RightBinaryNuclearityClassifier(object):
                     else:
                         raise ValueError("Weird prediction: {}".format(
                             y_pred))
+
             y.append(yi)
         return y

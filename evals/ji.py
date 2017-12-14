@@ -149,7 +149,7 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
     return ctree_pred
 
 
-def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain'):
+def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
     """Get the dtrees that correspond to the ctrees output by DPLP.
 
     Parameters
@@ -160,6 +160,9 @@ def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain'):
         Relation converter, from fine- to coarse-grained labels.
     nary_enc: one of {'chain', 'tree'}
         Encoding for n-ary nodes.
+    ctree_pred : dict(str, RSTTree), optional
+        RST c-trees, indexed by doc_name. If c-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
@@ -167,8 +170,8 @@ def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain'):
         RST dtree for each document.
     """
     dtree_pred = dict()
-
-    ctree_pred = load_ji_ctrees(ji_out_dir, rel_conv)
+    if ctree_pred is None:
+        ctree_pred = load_ji_ctrees(ji_out_dir, rel_conv)
     for doc_name, ct_pred in ctree_pred.items():
         dtree_pred[doc_name] = RstDepTree.from_rst_tree(
             ct_pred, nary_enc=nary_enc)

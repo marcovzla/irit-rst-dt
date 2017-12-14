@@ -127,7 +127,8 @@ def load_hayashi_hilda_ctrees(out_dir, rel_conv):
     return ctree_pred
 
 
-def load_hayashi_hilda_dtrees(out_dir, rel_conv, nary_enc='chain'):
+def load_hayashi_hilda_dtrees(out_dir, rel_conv, nary_enc='chain',
+                              ctree_pred=None):
     """Load the dtrees for the ctrees output by Hayashi et al.'s HILDA.
 
     Parameters
@@ -137,14 +138,18 @@ def load_hayashi_hilda_dtrees(out_dir, rel_conv, nary_enc='chain'):
     rel_conv: RstRelationConverter
         Converter for relation labels (fine- to coarse-grained, plus
         normalization).
+    ctree_pred : dict(str, RSTTree), optional
+        RST c-trees, indexed by doc_name. If c-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
     dtree_pred: dict(str, RstDepTree)
         RST dtree for each document.
     """
-    # load predicted ctrees
-    ctree_pred = load_hayashi_hilda_ctrees(out_dir, rel_conv)
+    if ctree_pred is None:
+        # load predicted ctrees
+        ctree_pred = load_hayashi_hilda_ctrees(out_dir, rel_conv)
     # convert to dtrees
     dtree_pred = dict()
     for doc_name, ct_pred in ctree_pred.items():

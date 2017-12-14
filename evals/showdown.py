@@ -11,6 +11,7 @@ import itertools
 import os
 
 from sklearn.datasets import load_svmlight_files
+from sklearn.linear_model.logistic import LogisticRegressionCV
 
 from educe.rst_dt.annotation import _binarize, SimpleRSTTree
 from educe.rst_dt.corpus import (RstRelationConverter,
@@ -215,7 +216,7 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         y_nuc_train.append(dt.nucs)
         y_rnk_train.append(dt.ranks)
     # nuclearity clf
-    if False:
+    if True:
         nuc_clf = DummyNuclearityClassifier(strategy=nuc_strategy,
                                             constant=nuc_constant)
         nuc_clf.fit(X_train, y_nuc_train)
@@ -236,7 +237,10 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
             n_features=46731,
             zero_based=False
         )
-        nuc_clf = RightBinaryNuclearityClassifier()
+        bin_clf = LogisticRegressionCV(Cs=10,  # defaults to 10
+                                       penalty='l1', solver='liblinear',
+                                       n_jobs=3)
+        nuc_clf = RightBinaryNuclearityClassifier(bin_clf=bin_clf)
         nuc_clf = nuc_clf.fit(X_nuc_train, y_nuc_train)
         # end WIP nuc_clf
     # rank clf
@@ -362,69 +366,79 @@ def main():
     for author_pred in authors_pred:
         # braud coling 2016
         if author_pred == 'BPS16':
+            ctree_pred = load_braud_coling_ctrees(BRAUD_COLING_OUT_DIR,
+                                                  REL_CONV)
             c_preds.append(
-                ('BPS16', load_braud_coling_ctrees(
-                    BRAUD_COLING_OUT_DIR, REL_CONV))
+                ('BPS16', ctree_pred)
             )
             d_preds.append(
                 ('BPS16', load_braud_coling_dtrees(
-                    BRAUD_COLING_OUT_DIR, REL_CONV, nary_enc='chain'))
+                    BRAUD_COLING_OUT_DIR, REL_CONV, nary_enc='chain',
+                    ctree_pred=ctree_pred))
             )
         # braud eacl 2017 - mono
         if author_pred == 'BCS17_mono':
+            ctree_pred = load_braud_eacl_ctrees(BRAUD_EACL_MONO, REL_CONV,
+                                                sorted_doc_names)
             c_preds.append(
-                ('BCS17_mono', load_braud_eacl_ctrees(
-                    BRAUD_EACL_MONO, REL_CONV, sorted_doc_names))
+                ('BCS17_mono', ctree_pred)
             )
             d_preds.append(
                 ('BCS17_mono', load_braud_eacl_dtrees(
                     BRAUD_EACL_MONO, REL_CONV, sorted_doc_names,
-                    nary_enc='chain'))
+                    nary_enc='chain', ctree_pred=ctree_pred))
             )
         # braud eacl 2017 - cross+dev
         if author_pred == 'BCS17_cross':
+            ctree_pred = load_braud_eacl_ctrees(BRAUD_EACL_CROSS_DEV,
+                                                REL_CONV, sorted_doc_names)
             c_preds.append(
-                ('BCS17_cross', load_braud_eacl_ctrees(
-                    BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names))
+                ('BCS17_cross', ctree_pred)
             )
             d_preds.append(
                 ('BCS17_cross', load_braud_eacl_dtrees(
                     BRAUD_EACL_CROSS_DEV, REL_CONV, sorted_doc_names,
-                    nary_enc='chain'))
+                    nary_enc='chain', ctree_pred=ctree_pred))
             )
 
         if author_pred == 'HHN16_HILDA':
+            ctree_pred = load_hayashi_hilda_ctrees(HAYASHI_HILDA_OUT_DIR,
+                                                   REL_CONV)
             c_preds.append(
-                ('HHN16_HILDA', load_hayashi_hilda_ctrees(
-                    HAYASHI_HILDA_OUT_DIR, REL_CONV))
+                ('HHN16_HILDA', ctree_pred)
             )
             d_preds.append(
                 ('HHN16_HILDA', load_hayashi_hilda_dtrees(
-                    HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain'))
+                    HAYASHI_HILDA_OUT_DIR, REL_CONV, nary_enc='chain',
+                    ctree_pred=ctree_pred))
             )
 
         if author_pred == 'HHN16_MST':
+            dtree_pred = load_hayashi_dep_dtrees(
+                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
+                    nuc_clf, rnk_clf)
             c_preds.append(
                 ('HHN16_MST', load_hayashi_dep_ctrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf))
+                    nuc_clf, rnk_clf, dtree_pred=dtree_pred))
             )
             d_preds.append(
-                ('HHN16_MST', load_hayashi_dep_dtrees(
-                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf))
+                ('HHN16_MST', dtree_pred)
             )
 
         if author_pred == 'LLC16':
+            ctree_pred = load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV)
             c_preds.append(
-                ('LLC16', load_li_qi_ctrees(LI_QI_OUT_DIR, REL_CONV))
+                ('LLC16', ctree_pred)
             )
             d_preds.append(
                 ('LLC16', load_li_qi_dtrees(LI_QI_OUT_DIR, REL_CONV,
-                                            nary_enc='chain'))
+                                            nary_enc='chain',
+                                            ctree_pred=ctree_pred))
             )
 
         if author_pred == 'li_sujian':
+            # FIXME load d-trees once, pass dtree_pred to the c-loader
             c_preds.append(
                 ('li_sujian', load_li_sujian_dep_ctrees(
                     LI_SUJIAN_OUT_FILE, REL_CONV_DTREE, EDUS_FILE_PAT,
@@ -437,6 +451,7 @@ def main():
             )
 
         if author_pred == 'FH14_gSVM':
+            # FIXME load c-trees once, pass ctree_pred to the d-loader
             c_preds.append(
                 ('FH14_gSVM', load_feng_ctrees(FENG1_OUT_DIR, REL_CONV))
             )
@@ -446,22 +461,26 @@ def main():
             )
 
         if author_pred == 'FH14_gCRF':
+            ctree_pred = load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV)
             c_preds.append(
-                ('FH14_gCRF', load_gcrf_ctrees(FENG2_OUT_DIR, REL_CONV))
+                ('FH14_gCRF', ctree_pred)
             )
             d_preds.append(
                 ('FH14_gCRF', load_gcrf_dtrees(FENG2_OUT_DIR, REL_CONV,
-                                               nary_enc='chain'))
+                                               nary_enc='chain',
+                                               ctree_pred=ctree_pred))
             )
 
         if author_pred == 'JCN15_1S1S':
             # CODRA outputs RST ctrees ; eval_codra_output maps them to RST dtrees
+            ctree_pred = load_codra_ctrees(CODRA_OUT_DIR, REL_CONV)
             c_preds.append(
-                ('JCN15_1S1S', load_codra_ctrees(CODRA_OUT_DIR, REL_CONV))
+                ('JCN15_1S1S', ctree_pred)
             )
             d_preds.append(
                 ('JCN15_1S1S', load_codra_dtrees(CODRA_OUT_DIR, REL_CONV,
-                                                 nary_enc='chain'))
+                                                 nary_enc='chain',
+                                                 ctree_pred=ctree_pred))
             )
             # joty-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because codra outputs binary ctrees,
@@ -470,13 +489,14 @@ def main():
         if author_pred == 'JE14':
             # DPLP outputs RST ctrees in the form of lists of spans;
             # load_ji_dtrees maps them to RST dtrees
+            ctree_pred = load_ji_ctrees(JI_OUT_DIR, REL_CONV)
             c_preds.append(
-                ('JE14', load_ji_ctrees(
-                    JI_OUT_DIR, REL_CONV))
+                ('JE14', ctree_pred)
             )
             d_preds.append(
-                ('JE14', load_ji_dtrees(
-                    JI_OUT_DIR, REL_CONV, nary_enc='chain'))
+                ('JE14', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
+                                        nary_enc='chain',
+                                        ctree_pred=ctree_pred))
             )
             # ji-{chain,tree} would be the same except nary_enc='tree' ;
             # the nary_enc does not matter because DPLP outputs binary ctrees,
@@ -498,47 +518,52 @@ def main():
             # hence both encodings result in (the same) strictly ordered dtrees
 
         if author_pred == 'SHV15_D':
+            ctree_pred = load_surdeanu_ctrees(SURDEANU_LOG_FILE, REL_CONV)
             c_preds.append(
-                ('SHV15_D', load_surdeanu_ctrees(
-                    SURDEANU_LOG_FILE, REL_CONV))
+                ('SHV15_D', ctree_pred)
             )
             d_preds.append(
                 ('SHV15_D', load_surdeanu_dtrees(
-                    SURDEANU_LOG_FILE, REL_CONV, nary_enc='chain'))
+                    SURDEANU_LOG_FILE, REL_CONV, nary_enc='chain',
+                    ctree_pred=ctree_pred))
             )
 
         if author_pred == 'ours-chain':
             # Eisner, predicted syntax, chain
+            dtree_pred = load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                            nuc_clf, rnk_clf)
             c_preds.append(
                 ('ours-chain', load_attelo_ctrees(
-                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
+                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
-                ('ours-chain', load_attelo_dtrees(
-                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
+                ('ours-chain', dtree_pred)
             )
 
         if author_pred == 'ours-tree':
             # Eisner, predicted syntax, tree + same-unit
+            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
+                                            EDUS_FILE, nuc_clf, rnk_clf)
             c_preds.append(
                 ('ours-tree', load_attelo_ctrees(
-                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
+                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
-                ('ours-tree', load_attelo_dtrees(
-                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf))
+                ('ours-tree', dtree_pred)
             )
         if author_pred == 'ours-tree-su':
             # Eisner, predicted syntax, tree + same-unit
+            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
+                                            EDUS_FILE, nuc_clf, rnk_clf)
             c_preds.append(
-                ('ours-tree-su', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                                    EDUS_FILE,
-                                                    nuc_clf, rnk_clf))
+                ('ours-tree-su', load_attelo_ctrees(
+                    EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE, nuc_clf, rnk_clf,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
-                ('ours-tree-su', load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                                    EDUS_FILE,
-                                                    nuc_clf, rnk_clf))
+                ('ours-tree-su', dtree_pred)
             )
         # 2017-05-17 enable "gold" as parser, should give perfect scores
         if author_pred == 'gold':

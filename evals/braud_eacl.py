@@ -122,10 +122,19 @@ def load_braud_eacl_ctrees(fpath, rel_conv, doc_names):
     return ctree_pred
 
 
-def load_braud_eacl_dtrees(fpath, rel_conv, doc_names, nary_enc='chain'):
-    """Do load dtrees"""
+def load_braud_eacl_dtrees(fpath, rel_conv, doc_names, nary_enc='chain',
+                           ctree_pred=None):
+    """Do load dtrees
+
+    Parameters
+    ----------
+    ctree_pred : dict(str, RSTTree), optional
+        RST c-trees, indexed by doc_name. If c-trees are provided this
+        way, `out_dir` is ignored.
+    """
     dtree_pred = dict()
-    ctree_pred = load_braud_eacl_ctrees(fpath, rel_conv, doc_names)
+    if ctree_pred is None:
+        ctree_pred = load_braud_eacl_ctrees(fpath, rel_conv, doc_names)
     for doc_name, ct_pred in ctree_pred.items():
         dt_pred = RstDepTree.from_rst_tree(ct_pred)
         dtree_pred[doc_name] = dt_pred

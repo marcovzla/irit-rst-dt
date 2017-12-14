@@ -117,7 +117,7 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
             else:
                 dt_pred.add_dependency(gid2num[src_id], gid2num[tgt_id], lbl)
         dt_pred.origin = mk_key(doc_name)
-        # add nuclearity: heuristic baseline
+        # add nuclearity: heuristic baseline WIP or true classifier
         dt_pred.nucs = nuc_clf.predict([dt_pred])[0]
         # add rank: heuristic baseline, needs edu2sent
         edu2sent = doc_name2edu2sent[doc_name]
@@ -129,7 +129,8 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
     return dtree_pred
 
 
-def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf):
+def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf,
+                       dtree_pred=None):
     """Load RST ctrees from attelo output files.
 
     Parameters
@@ -142,13 +143,18 @@ def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf):
         Classifier to predict nuclearity
     rnk_clf: RankClassifier
         Classifier to predict attachment ranking
+    dtree_pred : dict(str, RstDepTree), optional
+        RST d-trees, indexed by doc_name. If d-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
     TODO
     """
-    # load RST dtrees, with heuristics for nuc and rank
-    dtree_pred = load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf)
+    if dtree_pred is None:
+        # load RST dtrees, with heuristics for nuc and rank
+        dtree_pred = load_attelo_dtrees(output_file, edus_file, nuc_clf,
+                                        rnk_clf)
     # convert to RST ctrees
     ctree_pred = dict()
     for doc_name, dt_pred in dtree_pred.items():

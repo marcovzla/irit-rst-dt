@@ -90,7 +90,7 @@ def load_li_qi_ctrees(out_dir, rel_conv):
     return ctree_pred
 
 
-def load_li_qi_dtrees(out_dir, rel_conv, nary_enc='chain'):
+def load_li_qi_dtrees(out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
     """Get the dtrees that correspond to the ctrees output by Li Qi's parser.
 
     Parameters
@@ -99,21 +99,26 @@ def load_li_qi_dtrees(out_dir, rel_conv, nary_enc='chain'):
         Path to the base directory containing the output files.
     nary_enc: one of {'chain', 'tree'}
         Encoding for n-ary nodes.
+    ctree_pred : dict(str, RSTTree), optional
+        RST c-trees, indexed by doc_name. If c-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
     dtree_pred: dict(str, RstDepTree)
         RST dtree for each document.
     """
-    # load predicted trees
-    data_pred = load_li_qi_output_files(out_dir)
-    # filenames = data_pred['filenames']
-    doc_names_pred = data_pred['doc_names']
-    rst_ctrees_pred = data_pred['rst_ctrees']
-
+    if ctree_pred is None:
+        # load predicted trees
+        data_pred = load_li_qi_output_files(out_dir)
+        # filenames = data_pred['filenames']
+        doc_names_pred = data_pred['doc_names']
+        rst_ctrees_pred = data_pred['rst_ctrees']
+        ctree_pred = {doc_name: ct_pred for doc_name, ct_pred
+                      in itertools.izip(doc_names_pred, rst_ctrees_pred)}
     # build a dict from doc_name to ordered dtree (RstDepTree)
     dtree_pred = dict()
-    for doc_name, ct_pred in itertools.izip(doc_names_pred, rst_ctrees_pred):
+    for doc_name, ct_pred in ctree_pred.items():
         # constituency tree
         # replace fine-grained labels with coarse-grained labels ;
         # the files we have already contain the coarse labels, except their

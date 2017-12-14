@@ -195,7 +195,7 @@ def load_gcrf_ctrees(out_dir, rel_conv):
     return ctree_pred
 
 
-def load_gcrf_dtrees(out_dir, rel_conv, nary_enc='chain'):
+def load_gcrf_dtrees(out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
     """Get the dtrees that correspond to the ctrees output by gCRF.
 
     Parameters
@@ -204,13 +204,17 @@ def load_gcrf_dtrees(out_dir, rel_conv, nary_enc='chain'):
         Path to the base directory containing the output files.
     nary_enc: one of {'chain', 'tree'}
         Encoding for n-ary nodes.
+    ctree_pred : dict(str, RSTTree), optional
+        RST c-trees, indexed by doc_name. If c-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
     dtree_pred: dict(str, RstDepTree)
         RST dtree for each document.
     """
-    ctree_pred = load_gcrf_ctrees(out_dir, rel_conv)
+    if ctree_pred is None:
+        ctree_pred = load_gcrf_ctrees(out_dir, rel_conv)
     dtree_pred = dict()
     for doc_name, ct_pred in ctree_pred.items():
         dt_pred = RstDepTree.from_rst_tree(ct_pred, nary_enc=nary_enc)

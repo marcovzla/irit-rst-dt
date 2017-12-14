@@ -10,7 +10,7 @@ from glob import glob
 
 from educe.learning.edu_input_format import load_edu_input_file
 from educe.rst_dt.corpus import Reader
-from educe.rst_dt.deptree import RstDepTree
+from educe.rst_dt.deptree import RstDepTree, RstDtException
 from educe.rst_dt.dep2con import deptree_to_rst_tree
 
 
@@ -91,17 +91,13 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     ----------
     out_dir : str
         Path to the folder containing .dis files.
-
     rel_conv : RstRelationConverter
         Converter for relation labels (fine- to coarse-grained, plus
         normalization).
-
     edus_file_pat : str
         Pattern for the .edu_input files.
-
     nuc_clf : NuclearityClassifier
         Nuclearity classifier
-
     rnk_clf : RankClassifier
         Rank classifier
 
@@ -135,7 +131,7 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
 
 
 def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
-                            rnk_clf):
+                            rnk_clf, dtree_pred=None):
     """Load the ctrees for the dtrees output by one of Hayashi et al.'s
     dep parsers.
 
@@ -143,19 +139,18 @@ def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     ----------
     out_dir : str
         Path to the folder containing .dis files.
-
     rel_conv : RstRelationConverter
         Converter for relation labels (fine- to coarse-grained, plus
         normalization).
-
     edus_file_pat : str
         Pattern for the .edu_input files.
-
     nuc_clf : NuclearityClassifier
         Nuclearity classifier
-
     rnk_clf : RankClassifier
         Rank classifier
+    dtree_pred : dict(str, RstDepTree), optional
+        RST d-trees, indexed by doc_name. If d-trees are provided this
+        way, `out_dir` is ignored.
 
     Returns
     -------
@@ -163,9 +158,9 @@ def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
         RST ctree for each document.
     """
     ctree_pred = dict()
-
-    dtree_pred = load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat,
-                                         nuc_clf, rnk_clf)
+    if dtree_pred is None:
+        dtree_pred = load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat,
+                                             nuc_clf, rnk_clf)
     for doc_name, dt_pred in dtree_pred.items():
         try:
             ct_pred = deptree_to_rst_tree(dt_pred)
