@@ -1,14 +1,14 @@
-"""This utility script outputs a dataset of the nuclearity of RST edges.
+"""This utility script outputs a dataset of the relation of RST edges.
 
 Given the path to the RST-DT corpus and a dataset of candidate RST
 dependencies labelled with their gold coarse (class) RST relation (or
-none if they are unrelated), produce a similar dataset for the task
-of nuclearity prediction.
+none if they are unrelated), produce a filtered version of the dataset
+for the task of relation labelling.
 
-As of 2017-12-08, we filter out the instances for unrelated pairs of EDUs
-and left-oriented dependencies, only keeping right-oriented dependencies
-(except for "ROOT").
-The resulting dataset describes a binary classification problem.
+As of 2017-12-14, we filter out the instances for unrelated pairs of EDUs
+and dependencies headed by the fake root.
+The resulting dataset describes a n-ary classification problem whose
+labelset is the set of (coarse-grained) classes of RST relations.
 """
 
 from __future__ import absolute_import, print_function
@@ -25,7 +25,7 @@ from educe.rst_dt.deptree import RstDepTree
 
 
 def main(corpus, dataset, out_dir, nary_enc, model_split):
-    """Do prepare the nuclearity dataset.
+    """Do prepare the RST relation dataset.
 
     Parameters
     ----------
@@ -35,8 +35,6 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
         Path to the existing dataset labelled with coarse relations.
     out_dir : str
         Path to the output folder.
-    nary_enc : str, one of {'chain', 'tree'}
-        Encoding for n-ary nodes.
     model_split : str, one of {'none', 'sent', 'sent-para'}
         If not 'none', use distinct models for subsets of instances:
         * 'sent': intra- vs inter-sentential,
@@ -84,10 +82,10 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                         lbl2int = {lbl: i for i, lbl in int2lbl.items()}
                         unrelated = lbl2int["UNRELATED"]
                         root = lbl2int["ROOT"]
-                        # write labels in header of new svmlight file, as an
-                        # ordered list mapped to {1, 2}
-                        print(header_prefix + ' '.join((NUC_N, NUC_S)),
-                              file=data_out)
+                        # write labels in header of new svmlight file, here
+                        # we just copy the existing header (even if it has
+                        # ROOT and UNRELATED that should never appear here)
+                        print(header, file=data_out)
                         # stream through lines
                         for pair, line in itertools.izip(f_pairs, f_data):
                             # read candidate pair of EDUs
@@ -99,12 +97,6 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                             src_idx = int(src_id.rsplit('_', 1)[1])
                             doc_name, tgt_idx = tgt_id.rsplit('_', 1)
                             tgt_idx = int(tgt_idx)
-                            if tgt_idx < src_idx:
-                                # skip left dependencies: by construction,
-                                # their nuclearity can only be Satellite
-                                # (SN edges)
-                                continue
-                            # print(doc_name, src_id, tgt_id, src_idx, tgt_idx)
                             # read corresponding ref class (label), feature vector
                             lbl_idx, feat_vector = line.strip().split(' ', 1)
                             lbl_idx = int(lbl_idx)  # lbl currently encoded as int
@@ -130,14 +122,7 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                             dtree = rst_dcorpus[doc_name]
                             assert dtree.heads[tgt_idx] == src_idx
                             assert dtree.labels[tgt_idx] == lbl
-                            if dtree.nucs[tgt_idx] == NUC_N:
-                                nuc_idx = 1
-                            elif dtree.nucs[tgt_idx] == NUC_S:
-                                nuc_idx = 2
-                            else:
-                                raise ValueError("weird nuclearity {}".format(
-                                    dtree.nucs[tgt_idx]))
-                            print(str(nuc_idx) + ' ' + feat_vector,
+                            print(str(lbl_idx) + ' ' + feat_vector,
                                   file=data_out)
                             print(pair.strip(), file=pairs_out)
     elif model_split == 'sent':
@@ -170,12 +155,9 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                                 lbl2int = {lbl: i for i, lbl in int2lbl.items()}
                                 unrelated = lbl2int["UNRELATED"]
                                 root = lbl2int["ROOT"]
-                                # write labels in header of new svmlight file, as an
-                                # ordered list mapped to {1, 2}
-                                print(header_prefix + ' '.join((NUC_N, NUC_S)),
-                                      file=data_out_intra)
-                                print(header_prefix + ' '.join((NUC_N, NUC_S)),
-                                      file=data_out_inter)
+                                # write labels in header of new svmlight file
+                                print(header, file=data_out_intra)
+                                print(header, file=data_out_inter)
                                 # stream through lines
                                 for pair, line in itertools.izip(f_pairs, f_data):
                                     # read candidate pair of EDUs
@@ -187,12 +169,6 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                                     src_idx = int(src_id.rsplit('_', 1)[1])
                                     doc_name, tgt_idx = tgt_id.rsplit('_', 1)
                                     tgt_idx = int(tgt_idx)
-                                    if tgt_idx < src_idx:
-                                        # skip left dependencies: by construction,
-                                        # their nuclearity can only be Satellite
-                                        # (SN edges)
-                                        continue
-                                    # print(doc_name, src_id, tgt_id, src_idx, tgt_idx)
                                     # read corresponding ref class (label), feature vector
                                     lbl_idx, feat_vector = line.strip().split(' ', 1)
                                     lbl_idx = int(lbl_idx)  # lbl currently encoded as int
@@ -218,25 +194,26 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
                                     dtree = rst_dcorpus[doc_name]
                                     assert dtree.heads[tgt_idx] == src_idx
                                     assert dtree.labels[tgt_idx] == lbl
-                                    if dtree.nucs[tgt_idx] == NUC_N:
-                                        nuc_idx = 1
-                                    elif dtree.nucs[tgt_idx] == NUC_S:
-                                        nuc_idx = 2
-                                    else:
-                                        raise ValueError("weird nuclearity {}".format(
-                                            dtree.nucs[tgt_idx]))
                                     if ((' 269:' in feat_vector or
-                                         ' 303:' in feat_vector)):
+                                         ' 303:' in feat_vector) and
+                                        (' 103:' in feat_vector or
+                                         ' 158:' in feat_vector or
+                                         ' 234:' in feat_vector or
+                                         ' 314:' in feat_vector)):
                                         # 269 is same_sentence_intra_right
-                                        # 303 is same_sentence_intra_left
+                                        # 303 is same_sentence_intra_left ;
+                                        # 103 is same_para_inter_right
+                                        # 158 is same_para_inter_left
+                                        # 234 is same_para_intra_right
+                                        # 314 is same_para_intra_left
                                         # FIXME find a cleaner way
-                                        print(str(nuc_idx) + ' ' + feat_vector,
+                                        print(str(lbl_idx) + ' ' + feat_vector,
                                               file=data_out_intra)
                                         print(pair.strip(),
                                               file=pairs_out_intra)
                                     else:
                                         # inter-sentential
-                                        print(str(nuc_idx) + ' ' + feat_vector,
+                                        print(str(lbl_idx) + ' ' + feat_vector,
                                               file=data_out_inter)
                                         print(pair.strip(),
                                               file=pairs_out_inter)
@@ -244,7 +221,7 @@ def main(corpus, dataset, out_dir, nary_enc, model_split):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Prepare a nuclearity dataset.'
+        description='Prepare a relation dataset.'
     )
     parser.add_argument('--corpus',
                         help='Path to the RST-DT "main" corpus',
@@ -264,7 +241,7 @@ if __name__ == "__main__":
                         help='Output folder',
                         default=os.path.join(
                             os.path.expanduser('~'),
-                            'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC'
+                            'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_REL'
                         ))
     parser.add_argument('--nary_enc',
                         help='Encoding for n-ary nodes',

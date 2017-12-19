@@ -57,7 +57,7 @@ def load_attelo_output_file(output_file):
     return edges_pred
 
 
-def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
+def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf):
     """Load RST dtrees from attelo output files.
 
     Parameters
@@ -117,6 +117,10 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
             else:
                 dt_pred.add_dependency(gid2num[src_id], gid2num[tgt_id], lbl)
         dt_pred.origin = mk_key(doc_name)
+        # 2017-12-14 relabel relations
+        if rel_clf is not None:
+            dt_pred.labels = rel_clf.predict([dt_pred])[0]
+        # end relabel relations
         # add nuclearity: heuristic baseline WIP or true classifier
         dt_pred.nucs = nuc_clf.predict([dt_pred])[0]
         # add rank: heuristic baseline, needs edu2sent
@@ -129,7 +133,7 @@ def load_attelo_dtrees(output_file, edus_file, nuc_clf, rnk_clf):
     return dtree_pred
 
 
-def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf,
+def load_attelo_ctrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf,
                        dtree_pred=None):
     """Load RST ctrees from attelo output files.
 
@@ -153,8 +157,8 @@ def load_attelo_ctrees(output_file, edus_file, nuc_clf, rnk_clf,
     """
     if dtree_pred is None:
         # load RST dtrees, with heuristics for nuc and rank
-        dtree_pred = load_attelo_dtrees(output_file, edus_file, nuc_clf,
-                                        rnk_clf)
+        dtree_pred = load_attelo_dtrees(output_file, edus_file,
+                                        rel_clf, nuc_clf, rnk_clf)
     # convert to RST ctrees
     ctree_pred = dict()
     for doc_name, dt_pred in dtree_pred.items():

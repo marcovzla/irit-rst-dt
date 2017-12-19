@@ -7,11 +7,12 @@ from __future__ import print_function
 
 import argparse
 import codecs
+from collections import defaultdict
 import itertools
 import os
 
 from sklearn.datasets import load_svmlight_files
-from sklearn.linear_model.logistic import LogisticRegressionCV
+from sklearn.linear_model.logistic import LogisticRegression, LogisticRegressionCV
 
 from educe.rst_dt.annotation import _binarize, SimpleRSTTree
 from educe.rst_dt.corpus import (RstRelationConverter,
@@ -51,6 +52,7 @@ from evals.ours import (load_deptrees_from_attelo_output,
 from evals.surdeanu import load_surdeanu_ctrees, load_surdeanu_dtrees
 # 2017-12-12 nuc_clf WIP
 from evals.train_nuc_classifier import RightBinaryNuclearityClassifier
+from evals.train_rel_relabeller import RelationRelabeller
 # end WIP nuc_clf
 
 # RST corpus
@@ -204,6 +206,25 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         # flavours of dtree
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
         dtree_true[doc_name] = dt_true
+        # 2017-12-18 WIP print spiders in d-trees, see if some could be
+        # solved with para_idx
+        rnk_deps = defaultdict(list)  # gov -> list of (rnk, dep)
+        for i, (gov, rnk, nuc, lbl) in enumerate(
+                zip(dt_true.heads[1:], dt_true.ranks[1:], dt_true.nucs[1:],
+                    dt_true.labels[1:]),
+                start=1):
+            rnk_deps[gov].append((rnk, i))
+        ordered_deps = {k: sorted(v) for k, v in rnk_deps.items()}
+        for gov, ord_deps in sorted(ordered_deps.items()):
+            if ((any(x[1] < gov for x in ord_deps) and
+                 any(x[1] > gov for x in ord_deps))):
+                if doc_name.startswith('wsj_06'):
+                    print(doc_name, gov, ord_deps)
+                elif doc_name.startswith('file'):
+                    pass
+                else:
+                    raise ValueError("spider!")
+        # end 2017-12-18 WIP spiders
     # fit classifiers for nuclearity and rank (DIRTY)
     # NB: both are (dummily) fit on weakly ordered dtrees
     X_train = []
@@ -215,8 +236,68 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         X_train.append(dt)
         y_nuc_train.append(dt.nucs)
         y_rnk_train.append(dt.ranks)
+    # 2017-12-14 WIP relation relabeller
+    if False:
+        model_split = 'sent'  # {'none', 'sent'}
+        if model_split == 'none':
+            dset_folder = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_REL'
+            )
+            dset_rel_train = os.path.join(dset_folder, 'TRAINING.relations.sparse')
+            dset_rel_test = os.path.join(dset_folder, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_rel_train, y_rel_train, X_rel_test, y_rel_test = load_svmlight_files(
+                (dset_rel_train, dset_rel_test),
+                n_features=46731,
+                zero_based=False
+            )
+        elif model_split == 'sent':
+            # * intra
+            dset_folder_intra = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_REL_intrasent'
+            )
+            dset_train_intra = os.path.join(dset_folder_intra, 'TRAINING.relations.sparse')
+            dset_test_intra = os.path.join(dset_folder_intra, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_rel_train_intra, y_rel_train_intra, X_rel_test_intra, y_rel_test_intra = load_svmlight_files(
+                (dset_train_intra, dset_test_intra),
+                n_features=46731,
+                zero_based=False
+            )
+            # * inter
+            dset_folder_inter = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_REL_intersent'
+            )
+            dset_train_inter = os.path.join(dset_folder_inter, 'TRAINING.relations.sparse')
+            dset_test_inter = os.path.join(dset_folder_inter, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_rel_train_inter, y_rel_train_inter, X_rel_test_inter, y_rel_test_inter = load_svmlight_files(
+                (dset_train_inter, dset_test_inter),
+                n_features=46731,
+                zero_based=False
+            )
+            # put together intra and inter
+            X_rel_train = (X_rel_train_intra, X_rel_train_inter)
+            y_rel_train = (y_rel_train_intra, y_rel_train_inter)
+            # TODO the same for {X,y}_rel_test ?
+        else:
+            raise ValueError("what model_split?")
+        # common call
+        mul_clf = LogisticRegressionCV(Cs=10,  # defaults to 10,
+                                       penalty='l1', solver='liblinear',
+                                       n_jobs=3)
+        rel_clf = RelationRelabeller(mul_clf=mul_clf, model_split=model_split)
+        rel_clf = rel_clf.fit(X_rel_train, y_rel_train)
+    else:
+        rel_clf = None
+    # end 2017-12-14 relations relabeller
     # nuclearity clf
     if True:
+        # TODO see whether intra/inter-sentential would be good
+        # for the dummy nuc clf
         nuc_clf = DummyNuclearityClassifier(strategy=nuc_strategy,
                                             constant=nuc_constant)
         nuc_clf.fit(X_train, y_nuc_train)
@@ -225,22 +306,59 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         # shiny new nuc_clf ; still very hacky
         # import the nuclearity TRAIN and TEST sets generated from
         # the svmlight feature vectors (ahem)
-        dset_folder = os.path.join(
-            os.path.expanduser('~'),
-            'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC'
-        )
-        dset_train = os.path.join(dset_folder, 'TRAINING.relations.sparse')
-        dset_test = os.path.join(dset_folder, 'TEST.relations.sparse')
-        # FIXME read n_features from .vocab
-        X_nuc_train, y_nuc_train, X_nuc_test, y_nuc_test = load_svmlight_files(
-            (dset_train, dset_test),
-            n_features=46731,
-            zero_based=False
-        )
+        model_split = 'sent'
+        #
+        if model_split == 'none':
+            dset_folder = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC'
+            )
+            dset_train = os.path.join(dset_folder, 'TRAINING.relations.sparse')
+            dset_test = os.path.join(dset_folder, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_nuc_train, y_nuc_train, X_nuc_test, y_nuc_test = load_svmlight_files(
+                (dset_train, dset_test),
+                n_features=46731,
+                zero_based=False
+            )
+        elif model_split == 'sent':
+            # * intra
+            dset_folder_intra = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC_intrasent'
+            )
+            dset_train_intra = os.path.join(dset_folder_intra, 'TRAINING.relations.sparse')
+            dset_test_intra = os.path.join(dset_folder_intra, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_nuc_train_intra, y_nuc_train_intra, X_nuc_test_intra, y_nuc_test_intra = load_svmlight_files(
+                (dset_train_intra, dset_test_intra),
+                n_features=46731,
+                zero_based=False
+            )
+            # * inter
+            dset_folder_inter = os.path.join(
+                os.path.expanduser('~'),
+                'melodi/rst/irit-rst-dt/TMP/syn_pred_coarse_NUC_intersent'
+            )
+            dset_train_inter = os.path.join(dset_folder_inter, 'TRAINING.relations.sparse')
+            dset_test_inter = os.path.join(dset_folder_inter, 'TEST.relations.sparse')
+            # FIXME read n_features from .vocab
+            X_nuc_train_inter, y_nuc_train_inter, X_nuc_test_inter, y_nuc_test_inter = load_svmlight_files(
+                (dset_train_inter, dset_test_inter),
+                n_features=46731,
+                zero_based=False
+            )
+            # put together intra and inter
+            X_nuc_train = (X_nuc_train_intra, X_nuc_train_inter)
+            y_nuc_train = (y_nuc_train_intra, y_nuc_train_inter)
+            # TODO the same for {X,y}_nuc_test ?
+        else:
+            raise ValueError("what model_split?")
         bin_clf = LogisticRegressionCV(Cs=10,  # defaults to 10
                                        penalty='l1', solver='liblinear',
                                        n_jobs=3)
-        nuc_clf = RightBinaryNuclearityClassifier(bin_clf=bin_clf)
+        nuc_clf = RightBinaryNuclearityClassifier(bin_clf=bin_clf,
+                                                  model_split=model_split)
         nuc_clf = nuc_clf.fit(X_nuc_train, y_nuc_train)
         # end WIP nuc_clf
     # rank clf
@@ -248,7 +366,7 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         strategy=rnk_strategy, prioritize_same_unit=rnk_prioritize_same_unit,
         order=order)
     rnk_clf.fit(X_train, y_rnk_train)
-    return nuc_clf, rnk_clf
+    return nuc_clf, rnk_clf, rel_clf
 
 
 # FIXME:
@@ -336,8 +454,8 @@ def main():
     # ones with nuclearity
     # * tie the order with the encoding for n-ary nodes
     order = 'weak' if nary_enc_pred == 'tree' else 'strict'
-    nuc_clf, rnk_clf = setup_dtree_postprocessor(nary_enc=nary_enc_pred,
-                                                 order=order)
+    nuc_clf, rnk_clf, rel_clf = setup_dtree_postprocessor(
+        nary_enc=nary_enc_pred, order=order)
 
     # the eval compares parses for the test section of the RST corpus
     reader_test = RstReader(CD_TEST)
@@ -531,11 +649,11 @@ def main():
         if author_pred == 'ours-chain':
             # Eisner, predicted syntax, chain
             dtree_pred = load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                            nuc_clf, rnk_clf)
+                                            rel_clf, nuc_clf, rnk_clf)
             c_preds.append(
-                ('ours-chain', load_attelo_ctrees(
-                    EISNER_OUT_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf,
-                    dtree_pred=dtree_pred))
+                ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
+                                                  rel_clf, nuc_clf, rnk_clf,
+                                                  dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('ours-chain', dtree_pred)
@@ -543,12 +661,12 @@ def main():
 
         if author_pred == 'ours-tree':
             # Eisner, predicted syntax, tree + same-unit
-            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED,
-                                            EDUS_FILE, nuc_clf, rnk_clf)
+            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
+                                            rel_clf, nuc_clf, rnk_clf)
             c_preds.append(
-                ('ours-tree', load_attelo_ctrees(
-                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE, nuc_clf, rnk_clf,
-                    dtree_pred=dtree_pred))
+                ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
+                                                 rel_clf, nuc_clf, rnk_clf,
+                                                 dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('ours-tree', dtree_pred)
