@@ -7,7 +7,6 @@ from __future__ import print_function
 
 import argparse
 import codecs
-from collections import defaultdict
 import itertools
 import os
 
@@ -206,25 +205,6 @@ def setup_dtree_postprocessor(nary_enc='chain', order='strict',
         # flavours of dtree
         dt_true = RstDepTree.from_rst_tree(ct_true, nary_enc=nary_enc)
         dtree_true[doc_name] = dt_true
-        # 2017-12-18 WIP print spiders in d-trees, see if some could be
-        # solved with para_idx
-        rnk_deps = defaultdict(list)  # gov -> list of (rnk, dep)
-        for i, (gov, rnk, nuc, lbl) in enumerate(
-                zip(dt_true.heads[1:], dt_true.ranks[1:], dt_true.nucs[1:],
-                    dt_true.labels[1:]),
-                start=1):
-            rnk_deps[gov].append((rnk, i))
-        ordered_deps = {k: sorted(v) for k, v in rnk_deps.items()}
-        for gov, ord_deps in sorted(ordered_deps.items()):
-            if ((any(x[1] < gov for x in ord_deps) and
-                 any(x[1] > gov for x in ord_deps))):
-                if doc_name.startswith('wsj_06'):
-                    print(doc_name, gov, ord_deps)
-                elif doc_name.startswith('file'):
-                    pass
-                else:
-                    raise ValueError("spider!")
-        # end 2017-12-18 WIP spiders
     # fit classifiers for nuclearity and rank (DIRTY)
     # NB: both are (dummily) fit on weakly ordered dtrees
     X_train = []
@@ -460,6 +440,8 @@ def main():
     # the eval compares parses for the test section of the RST corpus
     reader_test = RstReader(CD_TEST)
     corpus_test = reader_test.slurp()
+    doc_edus_test = {k.doc: ct_true.leaves() for k, ct_true
+                     in corpus_test.items()}
 
     # reference: author_true can be any of the authors_pred (defaults to gold)
     ctree_true = dict()  # ctrees
@@ -533,12 +515,12 @@ def main():
 
         if author_pred == 'HHN16_MST':
             dtree_pred = load_hayashi_dep_dtrees(
-                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf)
+                HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, doc_edus_test,
+                EDUS_FILE_PAT, nuc_clf, rnk_clf)
             c_preds.append(
                 ('HHN16_MST', load_hayashi_dep_ctrees(
-                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf, dtree_pred=dtree_pred))
+                    HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, doc_edus_test,
+                    EDUS_FILE_PAT, nuc_clf, rnk_clf, dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('HHN16_MST', dtree_pred)
@@ -607,12 +589,12 @@ def main():
         if author_pred == 'JE14':
             # DPLP outputs RST ctrees in the form of lists of spans;
             # load_ji_dtrees maps them to RST dtrees
-            ctree_pred = load_ji_ctrees(JI_OUT_DIR, REL_CONV)
+            ctree_pred = load_ji_ctrees(JI_OUT_DIR, REL_CONV, doc_edus_test)
             c_preds.append(
                 ('JE14', ctree_pred)
             )
             d_preds.append(
-                ('JE14', load_ji_dtrees(JI_OUT_DIR, REL_CONV,
+                ('JE14', load_ji_dtrees(JI_OUT_DIR, REL_CONV, doc_edus_test,
                                         nary_enc='chain',
                                         ctree_pred=ctree_pred))
             )
@@ -649,10 +631,12 @@ def main():
         if author_pred == 'ours-chain':
             # Eisner, predicted syntax, chain
             dtree_pred = load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                            rel_clf, nuc_clf, rnk_clf)
+                                            rel_clf, nuc_clf, rnk_clf,
+                                            doc_edus=doc_edus_test)
             c_preds.append(
                 ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
                                                   rel_clf, nuc_clf, rnk_clf,
+                                                  doc_edus=doc_edus_test,
                                                   dtree_pred=dtree_pred))
             )
             d_preds.append(
@@ -662,10 +646,12 @@ def main():
         if author_pred == 'ours-tree':
             # Eisner, predicted syntax, tree + same-unit
             dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
-                                            rel_clf, nuc_clf, rnk_clf)
+                                            rel_clf, nuc_clf, rnk_clf,
+                                            doc_edus=doc_edus_test)
             c_preds.append(
                 ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
                                                  rel_clf, nuc_clf, rnk_clf,
+                                                 doc_edus=doc_edus_test,
                                                  dtree_pred=dtree_pred))
             )
             d_preds.append(
@@ -674,10 +660,12 @@ def main():
         if author_pred == 'ours-tree-su':
             # Eisner, predicted syntax, tree + same-unit
             dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                            EDUS_FILE, nuc_clf, rnk_clf)
+                                            EDUS_FILE, nuc_clf, rnk_clf,
+                                            doc_edus=doc_edus_test)
             c_preds.append(
                 ('ours-tree-su', load_attelo_ctrees(
                     EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE, nuc_clf, rnk_clf,
+                    doc_edus=doc_edus_test,
                     dtree_pred=dtree_pred))
             )
             d_preds.append(

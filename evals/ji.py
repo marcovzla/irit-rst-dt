@@ -11,35 +11,28 @@ import os
 from educe.annotation import Span
 from educe.corpus import FileId
 from educe.rst_dt.annotation import Node, RSTTree
-from educe.rst_dt.corpus import Reader
 from educe.rst_dt.deptree import RstDepTree
-from educe.rst_dt.rst_wsj_corpus import TEST_FOLDER
-
-# original RST corpus
-RST_CORPUS = os.path.join('/home/mmorey/corpora/rst-dt/rst_discourse_treebank/data')
-RST_MAIN_TEST = os.path.join(RST_CORPUS, TEST_FOLDER)
 
 
-def load_ji_ctrees(ji_out_dir, rel_conv):
+def load_ji_ctrees(ji_out_dir, rel_conv, doc_edus):
     """Load the ctrees output by DPLP as .brackets files.
 
     Parameters
     ----------
-    ji_out_dir: str
+    ji_out_dir : str
         Path to the base directory containing the output files.
+    rel_conv : RstRelationConverter?
+        Relation converter.
+    doc_edus : dict(str, list(EDU))
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus).
 
     Returns
     -------
     ctree_pred: dict(str, RSTTree)
         RST ctree for each document.
     """
-    # * load the text of the EDUs
-    # FIXME get the text of EDUs from the .merge files
-    corpus_dir = RST_MAIN_TEST
-    reader_true = Reader(corpus_dir)
-    ctree_true = reader_true.slurp()
-    doc_edus = {k.doc: ct_true.leaves() for k, ct_true
-                in ctree_true.items()}
+    # FIXME? get the text of EDUs from the .merge files?
     # * for each doc, load the predicted spans from the .brackets
     ctree_pred = dict()
     files_pred = os.path.join(ji_out_dir, '*.brackets')
@@ -149,7 +142,8 @@ def load_ji_ctrees(ji_out_dir, rel_conv):
     return ctree_pred
 
 
-def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
+def load_ji_dtrees(ji_out_dir, rel_conv, doc_edus, nary_enc='chain',
+                   ctree_pred=None):
     """Get the dtrees that correspond to the ctrees output by DPLP.
 
     Parameters
@@ -160,6 +154,9 @@ def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
         Relation converter, from fine- to coarse-grained labels.
     nary_enc: one of {'chain', 'tree'}
         Encoding for n-ary nodes.
+    doc_edus : dict(str, list(EDU))
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus).
     ctree_pred : dict(str, RSTTree), optional
         RST c-trees, indexed by doc_name. If c-trees are provided this
         way, `out_dir` is ignored.
@@ -171,7 +168,7 @@ def load_ji_dtrees(ji_out_dir, rel_conv, nary_enc='chain', ctree_pred=None):
     """
     dtree_pred = dict()
     if ctree_pred is None:
-        ctree_pred = load_ji_ctrees(ji_out_dir, rel_conv)
+        ctree_pred = load_ji_ctrees(ji_out_dir, rel_conv, doc_edus)
     for doc_name, ct_pred in ctree_pred.items():
         dtree_pred[doc_name] = RstDepTree.from_rst_tree(
             ct_pred, nary_enc=nary_enc)

@@ -9,18 +9,8 @@ import os
 from glob import glob
 
 from educe.learning.edu_input_format import load_edu_input_file
-from educe.rst_dt.corpus import Reader
 from educe.rst_dt.deptree import RstDepTree, RstDtException
 from educe.rst_dt.dep2con import deptree_to_rst_tree
-
-
-# load true ctrees, from the TEST section of the RST-DT, to get gold EDUs
-RST_DT_DIR = '/home/mmorey/corpora/rst-dt/rst_discourse_treebank/data'
-RST_TEST_DIR = os.path.join(RST_DT_DIR, 'RSTtrees-WSJ-main-1.0/TEST')
-if not os.path.exists(RST_TEST_DIR):
-    raise ValueError('Unable to find RST test files at ', RST_TEST_DIR)
-RST_TEST_READER = Reader(RST_TEST_DIR)
-RST_TEST_CTREES_TRUE = {k.doc: v for k, v in RST_TEST_READER.slurp().items()}
 
 
 def _load_hayashi_dep_file(f, edus):
@@ -67,24 +57,27 @@ def load_hayashi_dep_file(fname, edus):
         return _load_hayashi_dep_file(f, edus)
 
 
-def load_hayashi_dep_files(out_dir):
+def load_hayashi_dep_files(out_dir, doc_edus):
     """Load dep files output by one of Hayashi et al.'s parser.
 
     Parameters
     ----------
     out_dir: str
         Path to the folder containing the .dis files.
+    doc_edus : dict(str, list(EDU))
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus).
     """
     dtrees = dict()
     for fname in glob(os.path.join(out_dir, '*.dis')):
         doc_name = os.path.splitext(os.path.basename(fname))[0]
-        edus = RST_TEST_CTREES_TRUE[doc_name].leaves()
+        edus = doc_edus[doc_name]
         dtrees[doc_name] = load_hayashi_dep_file(fname, edus)
     return dtrees
 
 
-def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
-                            rnk_clf):
+def load_hayashi_dep_dtrees(out_dir, rel_conv, doc_edus, edus_file_pat,
+                            nuc_clf, rnk_clf):
     """Load the dtrees output by one of Hayashi et al.'s dep parsers.
 
     Parameters
@@ -94,6 +87,9 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     rel_conv : RstRelationConverter
         Converter for relation labels (fine- to coarse-grained, plus
         normalization).
+    doc_edus : dict(str, list(EDU))
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus).
     edus_file_pat : str
         Pattern for the .edu_input files.
     nuc_clf : NuclearityClassifier
@@ -108,7 +104,7 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     """
     dtree_pred = dict()
 
-    dtrees = load_hayashi_dep_files(out_dir)
+    dtrees = load_hayashi_dep_files(out_dir, doc_edus)
     for doc_name, dt_pred in dtrees.items():
         if rel_conv is not None:
             dt_pred = rel_conv(dt_pred)
@@ -130,8 +126,8 @@ def load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     return dtree_pred
 
 
-def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
-                            rnk_clf, dtree_pred=None):
+def load_hayashi_dep_ctrees(out_dir, rel_conv, doc_edus, edus_file_pat,
+                            nuc_clf, rnk_clf, dtree_pred=None):
     """Load the ctrees for the dtrees output by one of Hayashi et al.'s
     dep parsers.
 
@@ -142,6 +138,9 @@ def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     rel_conv : RstRelationConverter
         Converter for relation labels (fine- to coarse-grained, plus
         normalization).
+    doc_edus : dict(str, list(EDU))
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus).
     edus_file_pat : str
         Pattern for the .edu_input files.
     nuc_clf : NuclearityClassifier
@@ -159,7 +158,8 @@ def load_hayashi_dep_ctrees(out_dir, rel_conv, edus_file_pat, nuc_clf,
     """
     ctree_pred = dict()
     if dtree_pred is None:
-        dtree_pred = load_hayashi_dep_dtrees(out_dir, rel_conv, edus_file_pat,
+        dtree_pred = load_hayashi_dep_dtrees(out_dir, rel_conv, doc_edus,
+                                             edus_file_pat,
                                              nuc_clf, rnk_clf)
     for doc_name, dt_pred in dtree_pred.items():
         try:

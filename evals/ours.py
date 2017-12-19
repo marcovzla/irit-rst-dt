@@ -57,7 +57,8 @@ def load_attelo_output_file(output_file):
     return edges_pred
 
 
-def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf):
+def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf,
+                       doc_edus=None):
     """Load RST dtrees from attelo output files.
 
     Parameters
@@ -66,6 +67,13 @@ def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf):
         Path to the file that contains attelo's output
     edus_file: string
         Path to the file that describes EDUs.
+    doc_edus : dict(str, list(EDU)), optional
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus). If None, each EDU is re-created using information in
+        the `.edu_input` file, otherwise EDUs are created but their text
+        is taken from `doc_edus`.
+        FIXME avoid creating "new" EDUs altogether if `doc_edus` is not
+        None.
 
     Returns
     -------
@@ -85,7 +93,10 @@ def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf):
         # EDU info
         edu_num = int(att_edu.id.rsplit('_', 1)[1])
         edu_span = EduceSpan(att_edu.start, att_edu.end)
-        edu_text = att_edu.text
+        if doc_edus is not None:
+            edu_text = doc_edus[doc_name][edu_num - 1].raw_text
+        else:
+            edu_text = att_edu.text
         educe_edus[doc_name].append(EduceEDU(edu_num, edu_span, edu_text))
         # map global id of EDU to num of EDU inside doc
         gid2num[att_edu.id] = edu_num
@@ -134,7 +145,7 @@ def load_attelo_dtrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf):
 
 
 def load_attelo_ctrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf,
-                       dtree_pred=None):
+                       doc_edus=None, dtree_pred=None):
     """Load RST ctrees from attelo output files.
 
     Parameters
@@ -147,6 +158,13 @@ def load_attelo_ctrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf,
         Classifier to predict nuclearity
     rnk_clf: RankClassifier
         Classifier to predict attachment ranking
+    doc_edus : dict(str, list(EDU)), optional
+        Mapping from doc_name to the list of its EDUs (read from the
+        corpus). If None, each EDU is re-created using information in
+        the `.edu_input` file, otherwise EDUs are created but their text
+        is taken from `doc_edus`.
+        FIXME avoid creating "new" EDUs altogether if `doc_edus` is not
+        None.
     dtree_pred : dict(str, RstDepTree), optional
         RST d-trees, indexed by doc_name. If d-trees are provided this
         way, `out_dir` is ignored.
@@ -158,7 +176,8 @@ def load_attelo_ctrees(output_file, edus_file, rel_clf, nuc_clf, rnk_clf,
     if dtree_pred is None:
         # load RST dtrees, with heuristics for nuc and rank
         dtree_pred = load_attelo_dtrees(output_file, edus_file,
-                                        rel_clf, nuc_clf, rnk_clf)
+                                        rel_clf, nuc_clf, rnk_clf,
+                                        doc_edus=doc_edus)
     # convert to RST ctrees
     ctree_pred = dict()
     for doc_name, dt_pred in dtree_pred.items():
