@@ -361,9 +361,6 @@ def main():
     parser.add_argument('authors_pred', nargs='+',
                         choices=AUTHORS,
                         help="Author(s) of the predictions")
-    parser.add_argument('--nary_enc_pred', default='tree',
-                        choices=['tree', 'chain'],
-                        help="Encoding of n-ary nodes for the predictions")
     # reference
     parser.add_argument('--author_true', default='gold',
                         choices=AUTHORS + ['each'],  # NEW generate sim matrix
@@ -398,7 +395,6 @@ def main():
     args = parser.parse_args()
     author_true = args.author_true
     authors_pred = args.authors_pred
-    nary_enc_pred = args.nary_enc_pred
     binarize_true = args.binarize_true
     simple_rsttree = args.simple_rsttree
     # display
@@ -419,7 +415,8 @@ def main():
     # heuristically determined values for _pred but also _true, and adds
     # three trivial spans
     eval_li_dep = args.eval_li_dep
-
+    # nary_enc_true is used ; order_true currently is not (implicit in
+    # nary_enc_true)
     if binarize_true in ('right', 'right_mixed'):
         nary_enc_true = 'chain'
         order_true = 'strict'
@@ -433,9 +430,14 @@ def main():
     # 0. setup the postprocessors to flesh out unordered dtrees into ordered
     # ones with nuclearity
     # * tie the order with the encoding for n-ary nodes
-    order = 'weak' if nary_enc_pred == 'tree' else 'strict'
-    nuc_clf, rnk_clf, rel_clf = setup_dtree_postprocessor(
-        nary_enc=nary_enc_pred, order=order)
+    nuc_clf_chain, rnk_clf_chain, rel_clf_chain = setup_dtree_postprocessor(
+        nary_enc='chain', order='strict')
+    # FIXME explicit differenciation between (heuristic) classifiers for
+    # the "chain" vs "tree" transforms (2 parameters: nary_enc, order) ;
+    # nuc_clf, rnk_clf, rel_clf might contain implicit assumptions
+    # tied to the "chain" transform, might not be optimal for "tree"
+    nuc_clf_tree, rnk_clf_tree, rel_clf_tree = setup_dtree_postprocessor(
+        nary_enc='tree', order='weak')
 
     # the eval compares parses for the test section of the RST corpus
     reader_test = RstReader(CD_TEST)
@@ -514,13 +516,15 @@ def main():
             )
 
         if author_pred == 'HHN16_MST':
+            # paper: {nary_enc_pred='chain', order='strict'}
             dtree_pred = load_hayashi_dep_dtrees(
                 HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, doc_edus_test,
-                EDUS_FILE_PAT, nuc_clf, rnk_clf)
+                EDUS_FILE_PAT, nuc_clf_chain, rnk_clf_chain)
             c_preds.append(
                 ('HHN16_MST', load_hayashi_dep_ctrees(
                     HAYASHI_MST_OUT_DIR, REL_CONV_DTREE, doc_edus_test,
-                    EDUS_FILE_PAT, nuc_clf, rnk_clf, dtree_pred=dtree_pred))
+                    EDUS_FILE_PAT, nuc_clf_chain, rnk_clf_chain,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('HHN16_MST', dtree_pred)
@@ -538,16 +542,18 @@ def main():
             )
 
         if author_pred == 'li_sujian':
-            # FIXME load d-trees once, pass dtree_pred to the c-loader
+            # FIXME load d-trees once, pass dtree_pred to the c-loader ;
+            # paper says 'chain' transform, but it might be worth
+            # checking
             c_preds.append(
                 ('li_sujian', load_li_sujian_dep_ctrees(
                     LI_SUJIAN_OUT_FILE, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf))
+                    nuc_clf_chain, rnk_clf_chain))
             )
             d_preds.append(
                 ('li_sujian', load_li_sujian_dep_dtrees(
                     LI_SUJIAN_OUT_FILE, REL_CONV_DTREE, EDUS_FILE_PAT,
-                    nuc_clf, rnk_clf))
+                    nuc_clf_chain, rnk_clf_chain))
             )
 
         if author_pred == 'FH14_gSVM':
@@ -630,14 +636,16 @@ def main():
 
         if author_pred == 'ours-chain':
             # Eisner, predicted syntax, chain
-            dtree_pred = load_attelo_dtrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                            rel_clf, nuc_clf, rnk_clf,
-                                            doc_edus=doc_edus_test)
+            dtree_pred = load_attelo_dtrees(
+                EISNER_OUT_SYN_PRED, EDUS_FILE,
+                rel_clf_chain, nuc_clf_chain, rnk_clf_chain,
+                doc_edus=doc_edus_test)
             c_preds.append(
-                ('ours-chain', load_attelo_ctrees(EISNER_OUT_SYN_PRED, EDUS_FILE,
-                                                  rel_clf, nuc_clf, rnk_clf,
-                                                  doc_edus=doc_edus_test,
-                                                  dtree_pred=dtree_pred))
+                ('ours-chain', load_attelo_ctrees(
+                    EISNER_OUT_SYN_PRED, EDUS_FILE,
+                    rel_clf_chain, nuc_clf_chain, rnk_clf_chain,
+                    doc_edus=doc_edus_test,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('ours-chain', dtree_pred)
@@ -645,26 +653,30 @@ def main():
 
         if author_pred == 'ours-tree':
             # Eisner, predicted syntax, tree + same-unit
-            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
-                                            rel_clf, nuc_clf, rnk_clf,
-                                            doc_edus=doc_edus_test)
+            dtree_pred = load_attelo_dtrees(
+                EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
+                rel_clf_tree, nuc_clf_tree, rnk_clf_tree,
+                doc_edus=doc_edus_test)
             c_preds.append(
-                ('ours-tree', load_attelo_ctrees(EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
-                                                 rel_clf, nuc_clf, rnk_clf,
-                                                 doc_edus=doc_edus_test,
-                                                 dtree_pred=dtree_pred))
+                ('ours-tree', load_attelo_ctrees(
+                    EISNER_OUT_TREE_SYN_PRED, EDUS_FILE,
+                    rel_clf_tree, nuc_clf_tree, rnk_clf_tree,
+                    doc_edus=doc_edus_test,
+                    dtree_pred=dtree_pred))
             )
             d_preds.append(
                 ('ours-tree', dtree_pred)
             )
         if author_pred == 'ours-tree-su':
             # Eisner, predicted syntax, tree + same-unit
-            dtree_pred = load_attelo_dtrees(EISNER_OUT_TREE_SYN_PRED_SU,
-                                            EDUS_FILE, nuc_clf, rnk_clf,
-                                            doc_edus=doc_edus_test)
+            dtree_pred = load_attelo_dtrees(
+                EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE, 
+                rel_clf_tree, nuc_clf_tree, rnk_clf_tree,
+                doc_edus=doc_edus_test)
             c_preds.append(
                 ('ours-tree-su', load_attelo_ctrees(
-                    EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE, nuc_clf, rnk_clf,
+                    EISNER_OUT_TREE_SYN_PRED_SU, EDUS_FILE,
+                    rel_clf_tree, nuc_clf_tree, rnk_clf_tree,
                     doc_edus=doc_edus_test,
                     dtree_pred=dtree_pred))
             )
@@ -682,15 +694,17 @@ def main():
 
         if False:  # FIXME repair (or forget) these
             print('Eisner, predicted syntax + same-unit')
-            load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                             EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
-                                             nuc_clf, rnk_clf)
+            load_deptrees_from_attelo_output(
+                ctree_true, dtree_true,
+                EISNER_OUT_SYN_PRED_SU, EDUS_FILE,
+                rel_clf_chain, nuc_clf_chain, rnk_clf_chain)
             print('======================')
 
             print('Eisner, gold syntax')
-            load_deptrees_from_attelo_output(ctree_true, dtree_true,
-                                             EISNER_OUT_SYN_GOLD, EDUS_FILE,
-                                             nuc_clf, rnk_clf)
+            load_deptrees_from_attelo_output(
+                ctree_true, dtree_true,
+                EISNER_OUT_SYN_GOLD, EDUS_FILE,
+                rel_clf_chain, nuc_clf_chain, rnk_clf_chain)
             print('======================')
 
     # dependency eval
